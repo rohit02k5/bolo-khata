@@ -11,6 +11,7 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
   const [err, setErr] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
   const [lang, setLang] = useState("hinglish");
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -24,7 +25,12 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
   async function submit() {
     setBusy(true);
     try {
-      await api.joinShop(code, name, phone, lang);
+      const r = await api.joinShop(code, name, phone, lang, pin);
+      if (r.token) {
+        localStorage.setItem("bk_cust", r.token);
+        window.location.href = "/m";
+        return;
+      }
       setDone(true);
     } catch (e: any) {
       setErr(e?.message || "Failed");
@@ -50,6 +56,9 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
               placeholder="Aapka naam" />
             <input value={phone} onChange={(e) => setPhone(e.target.value)}
               placeholder="Phone (optional)" inputMode="tel" />
+            <input value={pin} onChange={(e) => setPin(e.target.value)}
+              placeholder="4-digit PIN — apna khata app ke liye (optional)"
+              inputMode="numeric" maxLength={4} />
             <select value={lang} onChange={(e) => setLang(e.target.value)}>
               <option value="hinglish">Hinglish</option>
               <option value="te">తెలుగు</option>

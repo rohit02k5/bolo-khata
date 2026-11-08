@@ -138,6 +138,7 @@ class JoinReq(BaseModel):
     name: str
     phone: str = ""
     lang_pref: str = "hinglish"
+    pin: str = ""
 
 
 @app.post("/api/join/{code}")
@@ -148,10 +149,85 @@ def join(code: str, req: JoinReq):
     name = req.name.strip()[:60]
     if not name:
         raise HTTPException(400, "name required")
-    cid = db.add_customer(name, phone=req.phone.strip()[:15],
-                          lang_pref=req.lang_pref)
-    return {"ok": True, "customer_id": cid,
-            "shop_name": shop["name"]}
+    # match an existing khata row by name (case-insensitive) so joining
+    # links to the customer's real history; else create
+    row = db.conn.execute(
+        "SELECT id FROM customers WHERE lower(name)=lower(?) "
+        "AND shop_id=?", (name, 1)).fetchone()
+    cid = row["id"] if row else db.add_customer(
+        name, phone=req.phone.strip()[:15], lang_pref=req.lang_pref)
+    out = {"ok": True, "customer_id": cid, "shop_name": shop["name"]}
+    if req.pin.strip():
+        if not req.pin.strip().isdigit() or len(req.pin.strip()) != 4:
+            raise HTTPException(400, "PIN must be exactly 4 digits")
+        aid = db.account_login(name, req.pin)
+        if aid is None:
+            raise HTTPException(401, "name taken — wrong PIN")
+        db.link_customer(aid, cid)
+        out["token"] = auth.issue_customer_token(aid)
+        out["account_id"] = aid
+    return out
+
+
+class CustLoginReq(BaseModel):
+    name: str
+    pin: str
+
+
+@app.post("/api/me/login")
+def customer_login(req: CustLoginReq):
+    if not req.pin.strip().isdigit() or len(req.pin.strip()) != 4:
+        raise HTTPException(400, "PIN must be exactly 4 digits")
+    aid = db.account_login(req.name.strip()[:60], req.pin)
+    if aid is None:
+        raise HTTPException(401, "name taken — wrong PIN")
+    return {"token": auth.issue_customer_token(aid),
+            "account_id": aid}
+
+
+@app.get("/api/me")
+def customer_me(aid: int = Depends(auth.current_customer)):
+    links = db.account_links(aid)
+    return {"account_id": aid,
+            "shops": [{"shop_name": r["shop_name"],
+                       "customer_name": r["customer_name"],
+                       "balance_paise": db.balance_paise(r["customer_id"])}
+                      for r in links]}
+
+
+@app.get("/api/me/ledger")
+def customer_ledger(aid: int = Depends(auth.current_customer)):
+    rows = db.account_ledger(aid)
+    return {"entries": [dict(r) for r in rows]}
+
+
+@app.get("/api/me/pending")
+def customer_pending(aid: int = Depends(auth.current_customer)):
+    rows = db.account_pending(aid)
+    out = []
+    for r in rows:
+        items = db.txn_items(r["id"]) if hasattr(db, "txn_items") else []
+        out.append({"id": r["id"], "amount_paise": r["amount_paise"],
+                    "ts": r["ts"], "shop_name": r["shop_name"],
+                    "confirm_token": r["confirm_token"],
+                    "items": [dict(i) for i in items]})
+    return {"pending": out}
+
+
+@app.get("/api/me/expenses")
+def customer_expenses(aid: int = Depends(auth.current_customer)):
+    return db.account_expenses(aid)
+
+
+@app.get("/api/me/reminders")
+def customer_reminders(aid: int = Depends(auth.current_customer)):
+    rows = db.account_reminders(aid)
+    out = []
+    for r in rows:
+        p = json.loads(r["payload"] or "{}")
+        out.append({"id": r["id"], "text": p.get("note_text", ""),
+                    "audio_path": f"/api/voice/{r['token']}.wav"})
+    return {"reminders": out}
 
 
 # ------------------------------------------------------ customer confirm

@@ -178,6 +178,25 @@ def test_delivery_skip_and_month_bill(db):
     assert b["total_paise"] == (dim - 2) * 2700
 
 
+def test_customer_account_pin_and_links(db):
+    aid = db.account_login("TestUser", "1234")
+    assert aid is not None
+    assert db.account_login("TestUser", "9999") is None  # wrong PIN
+    assert db.account_login("TestUser", "1234") == aid   # right PIN
+    cid = db.conn.execute(
+        "SELECT id FROM customers WHERE name='Ramesh'").fetchone()["id"]
+    db.link_customer(aid, cid)
+    db.link_customer(aid, cid)  # idempotent
+    links = db.account_links(aid)
+    assert len(links) == 1 and links[0]["customer_id"] == cid
+    # multi-shop khata data flows through
+    assert db.account_ledger(aid), "linked customer has seeded txns"
+    exp = db.account_expenses(aid)
+    assert exp["by_day"] and exp["by_shop"] and exp["by_month"]
+    pend = db.account_pending(aid)
+    assert all(p["confirm_state"] == "pending" for p in pend)
+
+
 def test_weekly_insights_intent_and_numbers(db):
     r = P.command_to_proposal("is hafte ka hisaab batao", "hinglish", db)
     assert r["intent"] == "weekly_insights" and not r["needs_confirm"]

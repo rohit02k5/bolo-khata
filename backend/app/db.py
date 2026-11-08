@@ -12,6 +12,7 @@ Money is integer paise. The ledger is append-only — undo marks the row
 from __future__ import annotations
 
 import json
+import secrets
 import sqlite3
 import time
 import uuid
@@ -95,6 +96,20 @@ CREATE TABLE IF NOT EXISTS delivery_skips (
     subscription_id INTEGER NOT NULL,
     day TEXT NOT NULL,           -- YYYY-MM-DD Asia/Kolkata
     UNIQUE(subscription_id, day)
+);
+CREATE TABLE IF NOT EXISTS customer_accounts (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    pin_hash TEXT NOT NULL,
+    created REAL DEFAULT 0,
+    UNIQUE(name)
+);
+CREATE TABLE IF NOT EXISTS customer_links (
+    id INTEGER PRIMARY KEY,
+    account_id INTEGER NOT NULL,
+    shop_id INTEGER NOT NULL,
+    customer_id INTEGER NOT NULL,
+    UNIQUE(account_id, customer_id)
 );
 CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY,
@@ -409,6 +424,125 @@ class ShopDB:
     def shop_by_join_code(self, code: str) -> sqlite3.Row | None:
         return self.conn.execute(
             "SELECT * FROM shops WHERE join_code=?", (code,)).fetchone()
+
+    # ---------------------------------------------- customer accounts
+    @staticmethod
+    def _pin_hash(name: str, pin: str) -> str:
+        import hashlib
+        return hashlib.sha256(
+            f"{pin.strip()}:{name.strip().lower()}:bk-cust-v1"
+            .encode()).hexdigest()
+
+    def account_login(self, name: str, pin: str) -> int | None:
+        """Create-or-login: first use of a name sets its PIN; a wrong
+        PIN on an existing name returns None."""
+        h = self._pin_hash(name, pin)
+        row = self.conn.execute(
+            "SELECT id,pin_hash FROM customer_accounts WHERE "
+            "name=?", (name.strip(),)).fetchone()
+        if row is None:
+            cur = self.conn.execute(
+                "INSERT INTO customer_accounts (name,pin_hash,created) "
+                "VALUES (?,?,?)", (name.strip(), h, time.time()))
+            self.conn.commit()
+            return cur.lastrowid
+        return row["id"] if secrets.compare_digest(
+            h, row["pin_hash"]) else None
+
+    def link_customer(self, account_id: int, customer_id: int) -> None:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO customer_links "
+            "(account_id,shop_id,customer_id) VALUES (?,?,?)",
+            (account_id, SHOP_ID, customer_id))
+        self.conn.commit()
+
+    def account_links(self, account_id: int) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT l.customer_id, l.shop_id, s.name AS shop_name, "
+            "c.name AS customer_name FROM customer_links l "
+            "JOIN shops s ON s.id=l.shop_id "
+            "JOIN customers c ON c.id=l.customer_id "
+            "WHERE l.account_id=?", (account_id,)).fetchall()
+
+    def _account_cids(self, account_id: int) -> list[int]:
+        return [r["customer_id"] for r in self.account_links(account_id)]
+
+    def account_ledger(self, account_id: int,
+                       limit: int = 100) -> list[sqlite3.Row]:
+        cids = self._account_cids(account_id)
+        if not cids:
+            return []
+        ph = ",".join("?" for _ in cids)
+        return self.conn.execute(
+            f"SELECT t.id,t.kind,t.amount_paise,t.ts,t.confirm_state,"
+            f"t.payment_method,t.customer_id,s.name AS shop_name "
+            f"FROM transactions t JOIN shops s ON s.id=t.shop_id "
+            f"WHERE t.customer_id IN ({ph}) AND t.status='ok' "
+            f"AND t.kind IN ('sale','credit_sale','payment') "
+            f"ORDER BY t.ts DESC LIMIT ?",
+            (*cids, limit)).fetchall()
+
+    def account_pending(self, account_id: int) -> list[sqlite3.Row]:
+        cids = self._account_cids(account_id)
+        if not cids:
+            return []
+        ph = ",".join("?" for _ in cids)
+        return self.conn.execute(
+            f"SELECT t.*, s.name AS shop_name FROM transactions t "
+            f"JOIN shops s ON s.id=t.shop_id "
+            f"WHERE t.customer_id IN ({ph}) "
+            f"AND t.confirm_state='pending' ORDER BY t.ts DESC",
+            (*cids,)).fetchall()
+
+    def account_reminders(self, account_id: int) -> list[sqlite3.Row]:
+        cids = self._account_cids(account_id)
+        if not cids:
+            return []
+        ph = ",".join("?" for _ in cids)
+        return self.conn.execute(
+            f"SELECT * FROM reminders WHERE customer_id IN ({ph}) "
+            f"AND kind='voice_note' AND done=0 ORDER BY id DESC",
+            (*cids,)).fetchall()
+
+    def account_expenses(self, account_id: int) -> dict:
+        cids = self._account_cids(account_id)
+        if not cids:
+            return {"by_day": [], "by_month": [], "by_shop": []}
+        ph = ",".join("?" for _ in cids)
+        from datetime import datetime
+        def agg(expr):
+            return [dict(r) for r in self.conn.execute(
+                f"SELECT {expr} AS k, SUM(amount_paise) AS total,"
+                f"COUNT(*) AS n FROM transactions "
+                f"WHERE customer_id IN ({ph}) AND status='ok' "
+                f"AND kind IN ('sale','credit_sale') "
+                f"GROUP BY k ORDER BY k", (*cids,)).fetchall()]
+        # SQLite ts is epoch float → date strings via datetime in python
+        rows = self.conn.execute(
+            f"SELECT ts, amount_paise, shop_id FROM transactions "
+            f"WHERE customer_id IN ({ph}) AND status='ok' "
+            f"AND kind IN ('sale','credit_sale')", (*cids,)).fetchall()
+        by_day: dict[str, int] = {}
+        by_month: dict[str, int] = {}
+        by_shop: dict[int, int] = {}
+        for r in rows:
+            d = datetime.fromtimestamp(r["ts"])
+            by_day[d.strftime("%Y-%m-%d")] = \
+                by_day.get(d.strftime("%Y-%m-%d"), 0) + r["amount_paise"]
+            by_month[d.strftime("%Y-%m")] = \
+                by_month.get(d.strftime("%Y-%m"), 0) + r["amount_paise"]
+            by_shop[r["shop_id"]] = \
+                by_shop.get(r["shop_id"], 0) + r["amount_paise"]
+        shop_names = {r["shop_id"]: r["shop_name"]
+                      for r in self.account_links(account_id)}
+        return {
+            "by_day": [{"k": k, "total": v} for k, v in
+                       sorted(by_day.items())[-30:]],
+            "by_month": [{"k": k, "total": v} for k, v in
+                         sorted(by_month.items())[-12:]],
+            "by_shop": [{"k": shop_names.get(k, str(k)), "total": v}
+                        for k, v in sorted(by_shop.items())],
+        }
 
     # --------------------------------------------------------- delivery
     def subscriptions(self, active_only: bool = True) -> list[sqlite3.Row]:
