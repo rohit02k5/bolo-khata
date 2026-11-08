@@ -7,6 +7,7 @@ TTS proxy. All writes are idempotent where a client supplies a key.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 
@@ -211,6 +212,34 @@ def list_reminders(actor: str = Depends(auth.current_actor)):
 def reminder_done(reminder_id: int,
                   actor: str = Depends(auth.current_actor)):
     return {"ok": db.complete_reminder(reminder_id)}
+
+
+# ------------------------------------------------------- voice-note page
+@app.get("/api/r/{token}")
+def reminder_view(token: str):
+    row = db.reminder_by_token(token)
+    if row is None:
+        raise HTTPException(404, "link not found")
+    p = json.loads(row["payload"] or "{}")
+    shop = db.shop_row()
+    return {"note_text": p.get("note_text") or p.get("text", ""),
+            "audio_url": row["audio_path"] or "",
+            "customer_name": row["customer_name"] or
+            p.get("customer_name", ""),
+            "shop_name": shop["name"] if shop else ""}
+
+
+@app.get("/api/voice/{token}.wav")
+def reminder_audio(token: str):
+    from fastapi.responses import FileResponse
+    import pathlib
+    row = db.reminder_by_token(token)
+    if row is None or not row["audio_path"]:
+        raise HTTPException(404, "audio not found")
+    f = pathlib.Path(config.DB_PATH).parent / "voice_notes" / f"{token}.wav"
+    if not f.exists():
+        raise HTTPException(404, "audio missing")
+    return FileResponse(str(f), media_type="audio/wav")
 
 
 @app.get("/api/reorder")

@@ -17,6 +17,13 @@ const CAPTION: Record<string, string> = {
   en: "Speak… mic is on",
 };
 
+const ICONS: Record<string, string> = {
+  maggi: "🍜", chini: "🍬", daal: "🫘", chawal: "🍚", aata: "🌾",
+  tel: "🫗", coke: "🥤", "parle-g": "🍪", doodh: "🥛", sabun: "🧼",
+};
+const icon = (name?: string) =>
+  ICONS[(name || "").toLowerCase()] || "🛒";
+
 export default function Home() {
   const [tok, setTok] = useState("");
   const [email, setEmail] = useState("owner@bolokhata.demo");
@@ -201,7 +208,7 @@ export default function Home() {
                 <tbody>
                   {proposal.items.map((i, idx) => (
                     <tr key={idx}>
-                      <td>{idx + 1}. {i.product_name || i.name}</td>
+                      <td>{idx + 1}. {icon(i.product_name || i.name)} {i.product_name || i.name}</td>
                       <td>{i.qty} {i.unit}</td>
                       <td className="num">{inr(i.line_total_paise)}</td>
                     </tr>
@@ -409,7 +416,7 @@ function StockPanel() {
       <div className="dim">Stock</div>
       {cat.products.map((p: any) => (
         <div className="entry" key={p.id}>
-          <span>{p.name_en} · {inr(p.price_paise)}/{p.unit}</span>
+          <span>{icon(p.name_en)} {p.name_en} · {inr(p.price_paise)}/{p.unit}</span>
           <span className={p.stock <= p.reorder_point ? "pill disputed" : ""}>
             {p.stock} {p.unit}
           </span>

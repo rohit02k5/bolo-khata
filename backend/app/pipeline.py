@@ -8,6 +8,7 @@ only happens on /api/confirm.
 
 from __future__ import annotations
 
+import json
 import time
 import uuid
 from dataclasses import asdict
@@ -62,6 +63,22 @@ def _bill_spoken(bill: Bill, lang: str) -> str:
     words = say_hinglish(amt // 100)
     who = f"{cust} ke khate mein " if cust else ""
     return f"{who}{n} cheezein, total {words} rupaye. Sahi hai?"
+
+
+def _voice_note_text(p: dict, lang: str, db) -> str:
+    """Template reminder — amount from the DB, never invented."""
+    name = p.get("customer_name") or "customer"
+    shop = db.shop_row()["name"] if hasattr(db, "shop_row") else "dukaan"
+    bal = db.balance_paise(p["customer_id"]) if p.get("customer_id") else 0
+    amt = bal // 100
+    if lang == "te":
+        return (f"నమస్తే {name} గారూ, {shop} నుండి గుర్తు చేస్తున్నాం — "
+                f"మీ బాకీ {amt} రూపాయలు ఉంది. ధన్యవాదాలు.")
+    if lang == "en":
+        return (f"Namaste {name} ji, a reminder from {shop} — "
+                f"your balance of {amt} rupees is pending. Thank you.")
+    return (f"Namaste {name} ji, {shop} se yaad dila rahe hain — "
+            f"aapka {amt} rupaye ka udhaar baaki hai. Shukriya.")
 
 
 def inr_words(paise: int) -> str:
@@ -296,8 +313,35 @@ def confirm(proposal_id: str, accept: bool, db, *,
     if entry["kind"] == "reminder":
         p = entry["obj"]
         rid = db.add_reminder(p["kind"], p, customer_id=p.get("customer_id"))
-        return {"ok": True, "written": True, "reminder_id": rid,
-                "spoken": speak_text.done(lang)}
+        out = {"ok": True, "written": True, "reminder_id": rid,
+               "spoken": speak_text.done(lang)}
+        if p["kind"] == "voice_note":
+            row = db.conn.execute(
+                "SELECT token FROM reminders WHERE id=?", (rid,)).fetchone()
+            token = row["token"] if row else ""
+            note = _voice_note_text(p, lang, db)
+            audio_err = ""
+            try:
+                from app.tts import synth_wav
+                audio, _ms = synth_wav(note, lang)
+                import pathlib
+                vdir = pathlib.Path(
+                    config.DB_PATH).parent / "voice_notes"
+                vdir.mkdir(parents=True, exist_ok=True)
+                f = vdir / f"{token}.wav"
+                f.write_bytes(audio)
+                db.set_reminder_audio(rid, f"/api/voice/{token}.wav")
+            except Exception as e:  # noqa: BLE001
+                audio_err = str(e)[:120]
+            db.conn.execute(
+                "UPDATE reminders SET payload=? WHERE id=?",
+                (json.dumps({**p, "note_text": note},
+                            ensure_ascii=False), rid))
+            db.conn.commit()
+            out["confirm_path"] = f"/r/{token}"
+            out["audio_error"] = audio_err
+            out["note_text"] = note
+        return out
 
     if entry["kind"] == "stock_out":
         p = entry["obj"]

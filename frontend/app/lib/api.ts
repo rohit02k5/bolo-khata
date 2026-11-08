@@ -96,6 +96,7 @@ export const api = {
     });
     return r.blob();
   },
+  reminderView: (tok: string) => req(`/api/r/${tok}`),
   confirmView: (tok: string) => req(`/api/confirm/${tok}`),
   confirmRespond: (tok: string, action: "confirm" | "dispute") =>
     req(`/api/confirm/${tok}/respond`, {

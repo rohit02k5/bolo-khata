@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS reminders (
     due_at REAL,
     done INTEGER DEFAULT 0,
     audio_path TEXT DEFAULT '',
+    token TEXT UNIQUE,
     customer_id INTEGER
 );
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -124,6 +125,10 @@ class ShopDB:
         if "join_code" not in cols:
             self.conn.execute(
                 "ALTER TABLE shops ADD COLUMN join_code TEXT")
+        rcols = {r[1] for r in
+                 self.conn.execute("PRAGMA table_info(reminders)")}
+        if "token" not in rcols:
+            self.conn.execute("ALTER TABLE reminders ADD COLUMN token TEXT")
         if not self.conn.execute("SELECT id FROM shops WHERE id=?",
                                  (SHOP_ID,)).fetchone():
             self.conn.execute(
@@ -347,10 +352,10 @@ class ShopDB:
                      audio_path: str = "") -> int:
         cur = self.conn.execute(
             "INSERT INTO reminders (shop_id,kind,payload,due_at,"
-            "audio_path,customer_id) VALUES (?,?,?,?,?,?)",
+            "audio_path,token,customer_id) VALUES (?,?,?,?,?,?,?)",
             (SHOP_ID, kind,
              json.dumps(payload, ensure_ascii=False), due_at,
-             audio_path, customer_id))
+             audio_path, uuid.uuid4().hex, customer_id))
         self.conn.commit()
         return cur.lastrowid
 
@@ -360,6 +365,18 @@ class ShopDB:
             "LEFT JOIN customers c ON c.id=r.customer_id "
             "WHERE r.shop_id=? AND r.done=? ORDER BY r.id DESC",
             (SHOP_ID, int(done))).fetchall()
+
+    def reminder_by_token(self, token: str) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT r.*, c.name AS customer_name FROM reminders r "
+            "LEFT JOIN customers c ON c.id=r.customer_id "
+            "WHERE r.token=?", (token,)).fetchone()
+
+    def set_reminder_audio(self, reminder_id: int, path: str) -> None:
+        self.conn.execute(
+            "UPDATE reminders SET audio_path=? WHERE id=?",
+            (path, reminder_id))
+        self.conn.commit()
 
     def complete_reminder(self, reminder_id: int) -> bool:
         cur = self.conn.execute(
