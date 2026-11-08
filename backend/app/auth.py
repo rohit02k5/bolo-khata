@@ -48,8 +48,33 @@ def current_actor(authorization: str = Header(default="")) -> str:
     token = authorization.removeprefix("Bearer ").strip()
     info = _TOKENS.get(token)
     if info and info[1] > time.time():
-        return "owner"
+        return info[0]  # "owner" or "staff:{id}"
     raise HTTPException(401, "login required")
+
+
+def require_owner(authorization: str = Header(default="")) -> str:
+    """Dependency: only the owner passes. Staff + customers get 403.
+    Roles come from the login on each device — never from voice."""
+    actor = current_actor(authorization)
+    if actor != "owner":
+        raise HTTPException(403, "owner-only action")
+    return actor
+
+
+def issue_staff_token(staff_id: int) -> str:
+    token = secrets.token_urlsafe(32)
+    _TOKENS[token] = (f"staff:{staff_id}", time.time() + _TTL)
+    return token
+
+
+def current_staff(authorization: str = Header(default="")) -> int:
+    """Dependency: returns staff_id or raises 401."""
+    token = authorization.removeprefix("Bearer ").strip()
+    info = _TOKENS.get(token)
+    if info and info[1] > time.time() and \
+            info[0].startswith("staff:"):
+        return int(info[0].split(":", 1)[1])
+    raise HTTPException(401, "staff login required")
 
 
 def issue_customer_token(account_id: int) -> str:

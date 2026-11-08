@@ -82,6 +82,16 @@ export const api = {
   reorder: () => req("/api/reorder"),
   deliveries: () => req("/api/deliveries"),
   weekly: () => req("/api/weekly"),
+  staffLogin: (name: string, pin: string) =>
+    req("/api/staff/login", {
+      method: "POST", body: JSON.stringify({ name, pin }),
+    }) as Promise<{ token: string; staff_id: number; role: string }>,
+  staffLeave: () => req("/api/staff/leave"),
+  staffLeaveRespond: (id: number, action: "accept" | "dispute") =>
+    req(`/api/staff/leave/${id}/respond`, {
+      method: "POST", body: JSON.stringify({ action }),
+    }),
+  leave: () => req("/api/leave"),
   shop: () => req("/api/shop") as Promise<{
     name: string; business_type: string; vpa: string; join_code: string;
   }>,
