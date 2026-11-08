@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { api, inr, setToken, speak, WS_URL, Proposal } from "./lib/api";
 import { VoiceSession } from "./lib/mic";
+import {
+  MicIcon, StopIcon, BookIcon, BoxIcon, ListIcon, StoreIcon,
+  UndoIcon, RefreshIcon, MoonIcon, SunIcon, DotsIcon, SpeakerIcon,
+  CashIcon, UpiIcon, CheckIcon, XIcon, SearchIcon, UserIcon,
+  OutIcon, ChartIcon, CalIcon,
+} from "./lib/icons";
 
 const LANGS = [
   { k: "hinglish", label: "Hinglish" },
@@ -23,9 +29,14 @@ const T: Record<string, Record<string, string>> = {
     thinking: "Samajh raha hoon…",
     speaking: "Bol raha hoon…",
     placeholder: "“2 kilo cheeni, 1 Maggi, Ramesh ke naam”",
-    cash: "💵 Cash", upi: "📲 UPI", khata: "📖 Khata me likho",
-    paid: "Abhi paid", ok: "✅ Sahi hai", no: "✖ Nahi",
-    undo: "↩︎ Undo last", refresh: "⟳",
+    cash: "Cash", cashSub: "haath me paisa aaya",
+    upi: "UPI", upiSub: "customer QR scan karega",
+    khata: "Khata me likho", paid: "Abhi paid",
+    ok: "Sahi hai", no: "Nahi", cancel: "Cancel",
+    undo: "Undo last", refresh: "Refresh",
+    themeD: "Dark mode", themeL: "Light mode",
+    tryS: "Try saying", today: "Aaj",
+    details: "Details",
     debug: "STT · parse · TTS",
     summary: "Aaj ka hisaab", pendingH: "Pending confirmations",
     balancesH: "Kaun kitna deta hai", recentH: "Recent",
@@ -38,8 +49,8 @@ const T: Record<string, Record<string, string>> = {
     shareWa: "WhatsApp pe bhejo ↗",
     linkNote: "Customer confirm link (WhatsApp/SMS se bhejo):",
     powered: "Powered by Gnani AI · Prisma + Timbre",
-    offline: "📶 Offline — entries sync nahi hongi, reconnect ho jayega",
-    staffMode: "👷 Staff mode — billing + stock only",
+    offline: "Offline — entries sync nahi hongi, reconnect ho jayega",
+    staffMode: "Staff mode — billing + stock only",
     micFail: "Mic nahi khula — permission check karo",
     parseFail: "Samajh nahi aaya — phir se boliye",
     silence: "Kuch sunai nahi diya — phir boliye",
@@ -53,9 +64,14 @@ const T: Record<string, Record<string, string>> = {
     thinking: "అర్థం చేస్తున్నాను…",
     speaking: "చెబుతున్నాను…",
     placeholder: "“రెండు కిలో పంచదార, రమేష్ పేరు”",
-    cash: "💵 క్యాష్", upi: "📲 UPI", khata: "📖 ఖాతాలో రాయి",
-    paid: "ఇప్పుడే చెల్లింపు", ok: "✅ సరే", no: "✖ వద్దు",
-    undo: "↩︎ రద్దు", refresh: "⟳",
+    cash: "నగదు", cashSub: "డబ్బు చేతిలో వచ్చింది",
+    upi: "UPI", upiSub: "కస్టమర్ QR స్కాన్ చేస్తారు",
+    khata: "ఖాతాలో రాయి", paid: "ఇప్పుడే చెల్లింపు",
+    ok: "సరే", no: "వద్దు", cancel: "వద్దు",
+    undo: "రద్దు", refresh: "రిఫ్రెష్",
+    themeD: "డార్క్ మోడ్", themeL: "లైట్ మోడ్",
+    tryS: "ఇలా చెప్పండి", today: "ఈరోజు",
+    details: "వివరాలు",
     debug: "STT · parse · TTS",
     summary: "ఈరోజు లెక్క", pendingH: "నిర్ధారణ కావాలి",
     balancesH: "ఎవరు ఎంత ఇవ్వాలి", recentH: "ఇటీవల",
@@ -68,8 +84,8 @@ const T: Record<string, Record<string, string>> = {
     shareWa: "WhatsApp లో పంపండి ↗",
     linkNote: "కస్టమర్ నిర్ధారణ లింక్:",
     powered: "Gnani AI · Prisma + Timbre తో నిర్మితం",
-    offline: "📶 ఆఫ్‌లైన్ — మళ్లీ కనెక్ట్ అవుతుంది",
-    staffMode: "👷 స్టాఫ్ మోడ్ — బిల్లింగ్ + స్టాక్ మాత్రమే",
+    offline: "ఆఫ్‌లైన్ — మళ్లీ కనెక్ట్ అవుతుంది",
+    staffMode: "స్టాఫ్ మోడ్ — బిల్లింగ్ + స్టాక్ మాత్రమే",
     micFail: "మైక్ తెరవలేదు — permission చూడండి",
     parseFail: "అర్థం కాలేదు — మళ్లీ చెప్పండి",
     silence: "ఏమీ వినపడలేదు — మళ్లీ చెప్పండి",
@@ -83,9 +99,14 @@ const T: Record<string, Record<string, string>> = {
     thinking: "Working it out…",
     speaking: "Speaking…",
     placeholder: "“2 kilo cheeni, 1 Maggi, for Ramesh”",
-    cash: "💵 Cash", upi: "📲 UPI", khata: "📖 Add to khata",
-    paid: "Pay now", ok: "✅ Looks right", no: "✖ No",
-    undo: "↩︎ Undo last", refresh: "⟳",
+    cash: "Cash", cashSub: "paid in hand",
+    upi: "UPI", upiSub: "customer scans the QR",
+    khata: "Add to khata", paid: "Pay now",
+    ok: "Looks right", no: "No", cancel: "Cancel",
+    undo: "Undo last", refresh: "Refresh",
+    themeD: "Dark mode", themeL: "Light mode",
+    tryS: "Try saying", today: "Today",
+    details: "Details",
     debug: "STT · parse · TTS",
     summary: "Today's takings", pendingH: "Pending confirmations",
     balancesH: "Who owes what", recentH: "Recent",
@@ -98,8 +119,8 @@ const T: Record<string, Record<string, string>> = {
     shareWa: "Send on WhatsApp ↗",
     linkNote: "Customer confirm link (send via WhatsApp/SMS):",
     powered: "Powered by Gnani AI · Prisma + Timbre",
-    offline: "📶 Offline — entries won't sync until reconnect",
-    staffMode: "👷 Staff mode — billing + stock only",
+    offline: "Offline — entries won't sync until reconnect",
+    staffMode: "Staff mode — billing + stock only",
     micFail: "Mic didn't open — check permission",
     parseFail: "Didn't catch that — say it again",
     silence: "Heard nothing — speak again",
@@ -159,6 +180,7 @@ export default function Home() {
   const [loginMode, setLoginMode] = useState<"owner" | "staff">("owner");
   const [online, setOnline] = useState(true);
   const [dark, setDark] = useState(false);
+  const [menu, setMenu] = useState(false);
   const session = useRef<VoiceSession | null>(null);
   const receiptRef = useRef<HTMLDivElement | null>(null);
 
@@ -327,11 +349,8 @@ export default function Home() {
     return (
       <main className="no-tabbar">
         <header className="topbar">
-          <div className="brand">
-            <h1>Bolo Khata</h1>
-            <span className="tag">voice-first kirana ledger</span>
-          </div>
-          <div className="lang-tabs">
+          <div className="wordmark">Bolo Khata</div>
+          <div className="seg" role="tablist" aria-label="language">
             {LANGS.map((l) => (
               <button key={l.k} className={lang === l.k ? "sel" : ""}
                 onClick={() => setLang(l.k)} aria-label={"language " + l.k}>
@@ -339,38 +358,48 @@ export default function Home() {
             ))}
           </div>
         </header>
-        <div className="card" style={{ textAlign: "center", padding: "28px 20px" }}>
-          <div style={{ fontSize: 44 }}>🎙️📒</div>
-          <div className="lead" style={{ margin: "8px 0 18px" }}>
-            {lang === "te" ? "మాట్లాడండి — ఖాతా తానే రాస్తుంది"
-              : lang === "en" ? "Speak — the khata writes itself"
-              : "Boliye — khata khud likh jayega"}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column",
+          justifyContent: "center" }}>
+          <div className="centre-col" style={{ gap: 10, marginBottom: 26 }}>
+            <div className="big-mic" aria-hidden="true"
+              style={{ width: 88, height: 88, pointerEvents: "none" }}>
+              <MicIcon size={34} /></div>
+            <div className="title">
+              {lang === "te" ? "మాట్లాడండి — ఖాతా తానే రాస్తుంది"
+                : lang === "en" ? "Speak — the khata writes itself"
+                : "Boliye — khata khud likh jayega"}</div>
           </div>
-          <div className="row" style={{ marginBottom: 14 }}>
-            <button className={loginMode === "owner" ? "primary grow" : "ghost grow"}
-              onClick={() => setLoginMode("owner")}>🏪 Owner</button>
-            <button className={loginMode === "staff" ? "primary grow" : "ghost grow"}
-              onClick={() => setLoginMode("staff")}>👷 Staff</button>
+          <div className="surface">
+            <div className="seg" style={{ marginBottom: 16, width: "100%" }}>
+              <button className={loginMode === "owner" ? "sel grow" : "grow"}
+                onClick={() => setLoginMode("owner")}>Owner</button>
+              <button className={loginMode === "staff" ? "sel grow" : "grow"}
+                onClick={() => setLoginMode("staff")}>Staff</button>
+            </div>
+            {loginMode === "owner" ? (
+              <div className="list">
+                <input value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email" aria-label="owner email" />
+                <input type="password" value={pw}
+                  onChange={(e) => setPw(e.target.value)} placeholder="password"
+                  aria-label="owner password" />
+                <button className="primary big" onClick={doLogin}
+                  style={{ marginTop: 6 }}>Login</button>
+              </div>
+            ) : (
+              <div className="list">
+                <input value={staffName}
+                  onChange={(e) => setStaffName(e.target.value)}
+                  placeholder={lang === "te" ? "పేరు" : "naam"}
+                  aria-label="staff name" />
+                <input value={staffPin} onChange={(e) => setStaffPin(e.target.value)}
+                  placeholder="4-digit PIN" inputMode="numeric" maxLength={4}
+                  aria-label="staff PIN" />
+                <button className="primary big" onClick={doStaffLogin}
+                  style={{ marginTop: 6 }}>Login</button>
+              </div>
+            )}
           </div>
-          {loginMode === "owner" ? (
-            <div className="list">
-              <input value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="email" aria-label="owner email" />
-              <input type="password" value={pw}
-                onChange={(e) => setPw(e.target.value)} placeholder="password"
-                aria-label="owner password" />
-              <button className="primary big" onClick={doLogin}>Login →</button>
-            </div>
-          ) : (
-            <div className="list">
-              <input value={staffName} onChange={(e) => setStaffName(e.target.value)}
-                placeholder={lang === "te" ? "పేరు" : "naam"} aria-label="staff name" />
-              <input value={staffPin} onChange={(e) => setStaffPin(e.target.value)}
-                placeholder="4-digit PIN" inputMode="numeric" maxLength={4}
-                aria-label="staff PIN" />
-              <button className="primary big" onClick={doStaffLogin}>Login →</button>
-            </div>
-          )}
         </div>
         <div className="powered">{t.powered}</div>
       </main>
@@ -378,60 +407,82 @@ export default function Home() {
   }
 
   /* ------------------------------------------------ app */
-  const TABS = [
-    ["counter", "🎙️", t.counter], ["ledger", "📒", t.ledger],
-    ["stock", "📦", t.stock], ["list", "📝", t.list],
-    ["shop", "🏪", t.shop],
-  ] as const;
+  const TABS: [typeof tab, any, string][] = [
+    ["counter", MicIcon, t.counter], ["ledger", BookIcon, t.ledger],
+    ["stock", BoxIcon, t.stock], ["list", ListIcon, t.list],
+    ["shop", StoreIcon, t.shop],
+  ];
+  const avgLevel = levels.reduce((a, b) => a + b, 0) / levels.length;
+  const today = summary?.total_sales_paise;
 
   return (
     <main>
       {!online && <div className="offline-bar">{t.offline}</div>}
       <header className="topbar">
-        <div className="brand">
-          <h1 style={{ fontSize: 20 }}>Bolo Khata</h1>
-        </div>
-        <div className="row" style={{ gap: 6 }}>
-          <div className="lang-tabs">
+        <div className="wordmark">Bolo Khata
+          <span className="sub">{role === "staff" ? "staff" : ""}</span></div>
+        <div className="row" style={{ gap: 8 }}>
+          <div className="seg" role="tablist" aria-label="language">
             {LANGS.map((l) => (
               <button key={l.k} className={lang === l.k ? "sel" : ""}
                 onClick={() => setLang(l.k)} aria-label={"language " + l.k}>
                 {l.label}</button>
             ))}
           </div>
-          <button className="ghost" style={{ padding: "8px 10px", minHeight: 40 }}
-            onClick={toggleTheme} aria-label="toggle dark mode">
-            {dark ? "☀️" : "🌙"}</button>
+          <div className="menu-wrap">
+            <button className="icon-btn" onClick={() => setMenu((m) => !m)}
+              aria-label="menu" aria-expanded={menu}>
+              <DotsIcon /></button>
+            {menu && (<>
+              <div style={{ position: "fixed", inset: 0, zIndex: 79 }}
+                onClick={() => setMenu(false)} />
+              <div className="menu" role="menu">
+                <button onClick={toggleTheme}>
+                  {dark ? <SunIcon size={20} /> : <MoonIcon size={20} />}
+                  {dark ? t.themeL : t.themeD}</button>
+                {role === "owner" && (
+                  <button onClick={() => { setMenu(false); doUndo(); }}>
+                    <UndoIcon size={20} />{t.undo}</button>)}
+                <button onClick={() => { setMenu(false); refresh(); }}>
+                  <RefreshIcon size={20} />{t.refresh}</button>
+                <button onClick={() => {
+                  localStorage.removeItem("bk_token");
+                  setToken(""); setTok(""); setMenu(false); }}>
+                  <OutIcon size={20} />Sign out</button>
+              </div>
+            </>)}
+          </div>
         </div>
       </header>
 
       {tab === "counter" && (<>
         {role === "staff" && (
-          <div className="card" style={{ background: "var(--info-soft)",
-            borderColor: "transparent" }}>
-            {t.staffMode}
-          </div>)}
+          <div className="surface tonal" style={{ padding: "12px 16px",
+            fontSize: 14, color: "var(--ink2)" }}>{t.staffMode}</div>)}
         {role === "staff" && <StaffLeaveBanner />}
 
-        {/* ------- mic stage: compacts so the receipt stays in frame ------- */}
-        <div className={"mic-stage" + ((proposal || result) ? " compact" : "")}>
+        {/* ------- mic stage: the one focal point ------- */}
+        <div className={"stage" + ((proposal || result) ? " compact" : "")}>
           <div className="transcript" aria-live="polite">
             {transcript
               ? transcript
               : <span className="ph">{t.placeholder}</span>}
           </div>
           <div className={"mic-orbit" + (listening ? " listening" : "")}>
-            <span className="mic-ring" /><span className="mic-ring r2" />
+            <span className="glow-ring" aria-hidden="true" />
+            <span className="level-ring" aria-hidden="true"
+              style={{ transform: `scale(${1 + avgLevel * 0.012})` }} />
             <button className={"big-mic" + (listening ? " on" : "")}
               onClick={toggleMic}
               aria-label={listening ? "stop listening" : "start listening"}>
-              {listening ? "⏹" : "🎤"}
+              {listening ? <StopIcon size={38} /> : <MicIcon size={40} />}
             </button>
           </div>
           <div className="wave" aria-hidden="true">
             {levels.map((h, i) => (
               <i key={i} className="bar"
-                style={{ height: phase === "listening" ? h : 6 }} />
+                style={{ height: phase === "listening"
+                  ? Math.min(30, h) : 5 }} />
             ))}
           </div>
           <div className="mic-caption">
@@ -440,8 +491,22 @@ export default function Home() {
              phase === "speaking" ? t.speaking :
              transcript ? t.tap : t.idle}
           </div>
+        </div>
+
+        {!proposal && !result && (<>
+          <div className="try-row">
+            <b>{t.tryS}:</b>{" "}
+            {lang === "te"
+              ? "“రెండు కిలో పంచదార” · “రమేష్ ఖాతా” · “ఈ వారం లెక్క”"
+              : lang === "en"
+              ? "“2 kilo cheeni” · “Ramesh ka khata” · “weekly summary”"
+              : "“2 kilo cheeni” · “Ramesh ka khata” · “is hafte ka hisaab”"}
+          </div>
+          {today != null && (
+            <div className="today-stat">{t.today}:{" "}
+              <b>{inr(today)}</b></div>)}
           <details className="debug">
-            <summary>{t.debug}</summary>
+            <summary>{t.details}</summary>
             <div className="latency">
               {detected && <span>lang <b>{detected}</b></span>}
               <span>STT <b>{lat.stt ?? "—"}ms</b></span>
@@ -449,106 +514,7 @@ export default function Home() {
               <span>TTS <b>{lat.tts ?? "—"}ms</b></span>
             </div>
           </details>
-        </div>
-
-        {/* ------- proposal: receipt ------- */}
-        {proposal && (
-          <div className="receipt" ref={receiptRef}>
-            <div className="row" style={{ justifyContent: "space-between",
-              marginBottom: 8 }}>
-              <span className="pill info">
-                {proposal.kind === "bill" ? "🧾 bill" : "⚙️ " + proposal.intent}
-              </span>
-              <span className={"conf " +
-                (proposal.confidence >= 0.85 ? "ok" :
-                 proposal.confidence >= 0.6 ? "warn" : "bad")}>
-                parse conf {(proposal.confidence * 100).toFixed(0)}%
-              </span>
-            </div>
-            {proposal.noise_hint &&
-              <span className="noise-chip">🌫 noise — card check karo</span>}
-            {proposal.customer_name && (
-              <div style={{ margin: "6px 0 2px" }}>
-                <span className="customer-chip">👤 {proposal.customer_name}</span>
-              </div>)}
-            {proposal.kind === "bill" && proposal.items?.length ? (
-              <table>
-                <tbody>
-                  {proposal.items.map((i, idx) => (
-                    <tr key={idx} className="slide-in"
-                      style={{ animationDelay: `${idx * 70}ms` }}>
-                      <td className="sr">{idx + 1}.</td>
-                      <td>{icon(i.product_name || i.name)}{" "}
-                        {i.product_name || i.name}</td>
-                      <td className="num dim">{unitPrice(i)}</td>
-                      <td className="num" style={{ fontWeight: 700 }}>
-                        {inr(i.line_total_paise)}</td>
-                    </tr>
-                  ))}
-                  <tr className="total-row">
-                    <td colSpan={3}>Total</td>
-                    <td className="num">{inr(proposal.total_paise)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            ) : (
-              <div style={{ fontSize: 18, margin: "8px 0", fontWeight: 600 }}>
-                {proposal.description}</div>
-            )}
-            {!!proposal.unresolved?.length && (
-              <div className="audio-note">⚠ unresolved:{" "}
-                {proposal.unresolved.join(", ")}</div>)}
-            <div className="audio-note" style={{ marginTop: 8 }}>
-              🔊 “{proposal.spoken}”</div>
-            {proposal.needs_confirm && (
-              <div className="row wrap" style={{ marginTop: 12 }}>
-                {proposal.kind === "bill" && (<>
-                  <button className="ok big grow" disabled={busy}
-                    onClick={() => setPaySheet(true)}>{t.paid} →</button>
-                  <button className="primary big grow"
-                    disabled={!proposal.customer_id || busy}
-                    onClick={() => doConfirm(true, "khata")}>{t.khata}</button>
-                </>)}
-                {proposal.kind === "action" && (
-                  <button className="ok big grow" disabled={busy}
-                    onClick={() => doConfirm(true)}>{t.ok}</button>)}
-                <button className="ghost" disabled={busy}
-                  onClick={() => doConfirm(false)}>{t.no}</button>
-              </div>)}
-          </div>
-        )}
-
-        {/* ------- result ------- */}
-        {result && (
-          <div className="card celebrate">
-            <div className="row" style={{ gap: 12 }}>
-              <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
-                <circle cx="17" cy="17" r="16" fill="var(--ok-soft)" />
-                <path className="check-draw" d="M10 17.5l5 5 9-11" fill="none"
-                  stroke="var(--ok)" strokeWidth="3.4" strokeLinecap="round"
-                  strokeLinejoin="round" />
-              </svg>
-              <div style={{ fontSize: 17, fontWeight: 700 }}>{result.text}</div>
-            </div>
-            {result.link && (<>
-              <div className="dim" style={{ margin: "10px 0 6px" }}>
-                {t.linkNote}</div>
-              <a className="confirm-link" href={result.link} target="_blank"
-                rel="noreferrer">{result.link}</a>
-              <a className="confirm-link" style={{ marginTop: 8 }}
-                href={`https://wa.me/?text=${encodeURIComponent(
-                  "Aapka udhaar confirm karein: " + result.link)}`}
-                target="_blank" rel="noreferrer">{t.shareWa}</a>
-            </>)}
-          </div>
-        )}
-
-        <div className="row">
-          {role === "owner" &&
-            <button className="ghost" onClick={doUndo}>{t.undo}</button>}
-          <button className="ghost" onClick={() => refresh()}>
-            {t.refresh} Refresh</button>
-        </div>
+        </>)}
       </>)}
 
       {tab === "ledger" && ledger && <LedgerPanel ledger={ledger}
@@ -557,43 +523,151 @@ export default function Home() {
       {tab === "list" && <RemindersPanel t={t} />}
       {tab === "shop" && (<><ShopPanel t={t} /><LeavePanel /></>)}
 
-      {/* ------- UPI / pay sheet ------- */}
-      {paySheet && proposal && (
+      {/* ------- bill sheet ------- */}
+      {proposal && (
         <>
-          <div className="sheet-back" onClick={() => setPaySheet(false)} />
-          <div className="sheet" role="dialog" aria-label="payment">
-            <h2 style={{ textAlign: "center" }}>
-              {inr(proposal.total_paise)}</h2>
-            <div className="dim" style={{ textAlign: "center",
-              margin: "4px 0 14px" }}>
-              {proposal.customer_name || "customer"}</div>
-            {upiQr ? (
-              <>
-                <img className="qr" src={upiQr.qr} alt="UPI QR" width={210} />
-                <div className="audio-note" style={{ textAlign: "center" }}>
-                  {t.selfReport}</div>
-                <button className="primary big grow" style={{ width: "100%",
-                  marginTop: 14 }}
-                  onClick={() => { setPaySheet(false); setUpiQr(null); }}>
-                  {t.done}</button>
-              </>) : (
-              <div className="list">
-                <button className="ok big" disabled={busy}
-                  onClick={() => doConfirm(true, "cash")}>{t.cash}</button>
-                <button className="primary big" disabled={busy}
-                  onClick={() => doConfirm(true, "upi")}>{t.upi}</button>
+          <div className="sheet-back"
+            onClick={() => { if (!busy && !paySheet) doConfirm(false); }} />
+          <div className="sheet" role="dialog" aria-label="bill"
+            ref={receiptRef}>
+            <div className="grab" aria-hidden="true" />
+            <div className="cust-head">
+              {proposal.customer_name
+                ? <span className="avatar">
+                    {proposal.customer_name.split(/\s+/)
+                      .map((w: string) => w[0]).slice(0, 2).join("")
+                      .toUpperCase()}</span>
+                : <span className="avatar"><UserIcon size={20} /></span>}
+              <div className="who">
+                <b>{proposal.customer_name ||
+                  (proposal.kind === "bill" ? "bill" : proposal.intent)}</b>
+                <span className="caption">
+                  parse conf {(proposal.confidence * 100).toFixed(0)}%
+                  {proposal.noise_hint ? " · noise — card check karo" : ""}
+                </span>
+              </div>
+            </div>
+            {proposal.kind === "bill" && proposal.items?.length ? (
+              <div className="bill-rows">
+                {proposal.items.map((i, idx) => (
+                  <div className="bill-row" key={idx}
+                    style={{ animationDelay: `${idx * 40}ms` }}>
+                    <span className="em">
+                      {icon(i.product_name || i.name)}</span>
+                    <span className="nm">{i.product_name || i.name}</span>
+                    <span className="qn">{unitPrice(i)}</span>
+                    <span className="amt2">{inr(i.line_total_paise)}</span>
+                  </div>))}
+                <div className="bill-total">
+                  <span className="lab">Total</span>
+                  <span className="amt">{inr(proposal.total_paise)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="title" style={{ fontSize: 19,
+                margin: "14px 0 4px" }}>{proposal.description}</div>
+            )}
+            {!!proposal.unresolved?.length && (
+              <div className="readback"><XIcon size={15} />
+                <span>unresolved: {proposal.unresolved.join(", ")}</span></div>)}
+            {proposal.spoken && (
+              <div className="readback"><SpeakerIcon size={15} />
+                <span>“{proposal.spoken}”</span></div>)}
+            {proposal.needs_confirm && !paySheet && (
+              <div className="sheet-foot">
+                {proposal.kind === "bill" ? (<>
+                  <button className="primary big" style={{ width: "100%" }}
+                    disabled={!proposal.customer_id || busy}
+                    onClick={() => doConfirm(true, "khata")}>{t.khata}</button>
+                  <button className="big" style={{ width: "100%",
+                    background: "var(--s2)" }} disabled={busy}
+                    onClick={() => setPaySheet(true)}>{t.paid}</button>
+                </>) : (
+                  <button className="primary big" style={{ width: "100%" }}
+                    disabled={busy}
+                    onClick={() => doConfirm(true)}>{t.ok}</button>)}
+                <button className="link cancel-link" disabled={busy}
+                  onClick={() => doConfirm(false)}>{t.cancel}</button>
               </div>)}
+          </div>
+        </>)}
+
+      {/* ------- pay method sheet ------- */}
+      {paySheet && proposal && (
+        <div className="sheet" role="dialog" aria-label="payment"
+          style={{ zIndex: 62 }}>
+          <div className="grab" aria-hidden="true" />
+          <div className="centre-col" style={{ marginBottom: 14 }}>
+            <div className="display">{inr(proposal.total_paise)}</div>
+            <div className="caption">{proposal.customer_name || "customer"}</div>
+          </div>
+          {upiQr ? (
+            <div className="centre-col" style={{ gap: 12 }}>
+              <div className="qr-tile">
+                <img src={upiQr.qr} alt="UPI QR" width={200} /></div>
+              <div className="caption">{t.selfReport}</div>
+              <button className="primary big" style={{ width: "100%" }}
+                onClick={() => { setPaySheet(false); setUpiQr(null); }}>
+                {t.done}</button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column",
+              gap: 10 }}>
+              <button className="pay-row" disabled={busy}
+                onClick={() => doConfirm(true, "cash")}>
+                <CashIcon size={24} />
+                <span>{t.cash}<span className="sub">{t.cashSub}</span></span>
+              </button>
+              <button className="pay-row" disabled={busy}
+                onClick={() => doConfirm(true, "upi")}>
+                <UpiIcon size={24} />
+                <span>{t.upi}<span className="sub">{t.upiSub}</span></span>
+              </button>
+              <button className="link cancel-link"
+                onClick={() => setPaySheet(false)}>{t.cancel}</button>
+            </div>)}
+        </div>)}
+
+      {/* ------- result: calm done state ------- */}
+      {result && (
+        <>
+          <div className="sheet-back" onClick={() => setResult(null)} />
+          <div className="sheet" role="status" aria-live="polite"
+            style={{ textAlign: "center" }}>
+            <div className="grab" aria-hidden="true" />
+            <div className="centre-col" style={{ gap: 10, paddingTop: 4 }}>
+              <svg width="56" height="56" viewBox="0 0 34 34"
+                aria-hidden="true">
+                <circle cx="17" cy="17" r="16" fill="var(--ok-soft)" />
+                <path className="check-draw" d="M10 17.5l5 5 9-11" fill="none"
+                  stroke="var(--ok)" strokeWidth="3.4" strokeLinecap="round"
+                  strokeLinejoin="round" />
+              </svg>
+              <div className="title" style={{ fontSize: 20 }}>{result.text}</div>
+              {result.link && (<>
+                <div className="caption">{t.linkNote}</div>
+                <a className="confirm-link" href={result.link} target="_blank"
+                  rel="noreferrer">{result.link}</a>
+                <a className="confirm-link"
+                  href={`https://wa.me/?text=${encodeURIComponent(
+                    "Aapka udhaar confirm karein: " + result.link)}`}
+                  target="_blank" rel="noreferrer">{t.shareWa}</a>
+              </>)}
+              <button className="primary big" style={{ width: "100%",
+                marginTop: 8 }} onClick={() => setResult(null)}>
+                {t.done}</button>
+            </div>
           </div>
         </>)}
 
       <nav className="tabbar" aria-label="main">
         <div className="tabs">
           {TABS.filter(([k]) => role === "owner" || k !== "shop")
-            .map(([k, ic, lb]) => (
+            .map(([k, Ic, lb]) => (
             <button key={k} className={tab === k ? "sel" : ""}
               onClick={() => setTab(k as any)} aria-label={lb}>
-              <span className="tic" aria-hidden="true">{ic}</span>{lb}
-            </button>))}
+              <Ic size={21} />{lb}
+              <span className="dot" aria-hidden="true" /></button>))}
         </div>
       </nav>
       {toast && <div className="toast" role="status">{toast}</div>}
@@ -610,60 +684,74 @@ function LedgerPanel({ ledger, summary, t }: any) {
   const initials = (n: string) =>
     n.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   return (
-    <div className="card list">
+    <>
       {summary && (
-        <div className="card" style={{ background: "var(--primary-soft)",
-          borderColor: "transparent", boxShadow: "none" }}>
-          <div className="section-head" style={{ marginTop: 0 }}>
-            {t.summary}</div>
-          <div className="hero-num">{inr(summary.total_sales_paise)}</div>
-          <div className="dim">
+        <div className="surface" style={{ background:
+          "linear-gradient(140deg, var(--primary-soft), var(--s1) 65%)",
+          boxShadow: "var(--e1)" }}>
+          <div className="caption">{t.summary}</div>
+          <div className="display">{inr(summary.total_sales_paise)}</div>
+          <div className="caption" style={{ marginTop: 4 }}>
             {(Object.entries(summary.by_kind || {}) as
               [string, { count: number; amount_paise: number }][])
-              .map(([k, v]) => `${k}: ${v.count} × ${inr(v.amount_paise)}`)
-              .join(" · ")}</div>
+              .map(([k, v]) => `${v.count} ${k.replace(/_/g, " ")} · ${inr(v.amount_paise)}`)
+              .join("  ·  ")}</div>
         </div>)}
-      <input value={q} onChange={(e) => setQ(e.target.value)}
-        placeholder={"🔍 " + t.searchPh} aria-label="search customer" />
+      <div className="row" style={{ marginTop: 16 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)}
+          placeholder={t.searchPh} aria-label="search customer" />
+      </div>
       <div className="section-head">{t.pendingH}</div>
-      {ledger.pending?.filter((p: any) => filt(p.customer_name))
-        .map((p: any) => (
-        <div className="entry" key={p.id}>
-          <span className="row">
-            <span className="avatar">{initials(p.customer_name)}</span>
-            {p.customer_name}
-          </span>
-          <span className="row" style={{ gap: 8 }}>
-            <b className="bal due">{inr(p.amount_paise)}</b>
-            <span className={"pill " + p.confirm_state}>{p.confirm_state}</span>
-          </span>
-        </div>))}
-      {!ledger.pending?.length &&
-        <div className="empty-state"><span className="em">✅</span>{t.none}</div>}
-      <div className="section-head">{t.balancesH}</div>
-      {ledger.balances?.filter((b: any) => filt(b.name)).map((b: any) => (
-        <div className="entry" key={b.customer_id}>
-          <span className="row">
-            <span className="avatar">{initials(b.name)}</span>
-            <span>{b.name}
-              {b.trust && <span className="dim"
-                title="confirmed share + payment history">
-                {" "}· trust {b.trust.score}</span>}
+      <div className="surface" style={{ padding: "4px 16px" }}>
+        <div className="list">
+        {ledger.pending?.filter((p: any) => filt(p.customer_name))
+          .map((p: any) => (
+          <div className="entry" key={p.id}>
+            <span className="row">
+              <span className="avatar">{initials(p.customer_name)}</span>
+              {p.customer_name}
             </span>
-          </span>
-          <b className={"bal " + (b.balance_paise > 0 ? "owe" : "paid")}>
-            {inr(b.balance_paise)}</b>
-        </div>))}
+            <span className="row" style={{ gap: 9 }}>
+              <b className="bal due">{inr(p.amount_paise)}</b>
+              <span className={"dot-st " + p.confirm_state}
+                title={p.confirm_state} /></span>
+          </div>))}
+        {!ledger.pending?.length &&
+          <div className="empty-state"><span className="em">✓</span>
+            {t.none}</div>}
+        </div>
+      </div>
+      <div className="section-head">{t.balancesH}</div>
+      <div className="surface" style={{ padding: "4px 16px" }}>
+        <div className="list">
+        {ledger.balances?.filter((b: any) => filt(b.name)).map((b: any) => (
+          <div className="entry" key={b.customer_id}>
+            <span className="row">
+              <span className="avatar">{initials(b.name)}</span>
+              <span>{b.name}
+                {b.trust && <span className="caption">
+                  {"  ·  trust "}{b.trust.score}</span>}
+              </span>
+            </span>
+            <b className={"bal " + (b.balance_paise > 0 ? "owe" : "paid")}>
+              {inr(b.balance_paise)}</b>
+          </div>))}
+        </div>
+      </div>
       <div className="section-head">{t.recentH}</div>
-      {ledger.recent?.slice(0, 12).map((x: any) => (
-        <div className="entry" key={x.id}>
-          <span>{x.kind}{x.customer_name ? ` · ${x.customer_name}` : ""}</span>
-          <span>{inr(x.amount_paise)}{" "}
-            {x.confirm_state !== "none" && x.confirm_state !== "na" &&
-              <span className={"pill " + x.confirm_state}>
-                {x.confirm_state}</span>}</span>
-        </div>))}
-    </div>
+      <div className="surface" style={{ padding: "4px 16px" }}>
+        <div className="list">
+        {ledger.recent?.slice(0, 12).map((x: any) => (
+          <div className="entry" key={x.id}>
+            <span>{x.kind}{x.customer_name ? ` · ${x.customer_name}` : ""}</span>
+            <span className="row" style={{ gap: 8 }}>{inr(x.amount_paise)}
+              {x.confirm_state !== "none" && x.confirm_state !== "na" &&
+                <span className={"dot-st " + x.confirm_state}
+                  title={x.confirm_state} />}</span>
+          </div>))}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -675,22 +763,24 @@ function StaffLeaveBanner() {
   useEffect(() => { load(); }, []);
   if (!items.length) return null;
   return (
-    <div className="card" style={{ background: "var(--warn-soft)",
-      borderColor: "transparent" }}>
+    <div className="surface" style={{ background: "var(--warn-soft)",
+      boxShadow: "none" }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>
-        📋 Owner ne chutti mark ki — sahi hai?</div>
+        Owner ne chutti mark ki — sahi hai?</div>
       {items.map((l) => (
         <div className="entry" key={l.id}>
           <span>{l.day} · by {l.marked_by}</span>
           <span style={{ display: "flex", gap: 8 }}>
-            <button className="ok" style={{ minHeight: 48, minWidth: 48 }}
+            <button className="ok" style={{ minHeight: 48, minWidth: 52 }}
               aria-label="accept leave"
               onClick={async () => {
-                await api.staffLeaveRespond(l.id, "accept"); load(); }}>✔</button>
-            <button className="danger" style={{ minHeight: 48, minWidth: 48 }}
+                await api.staffLeaveRespond(l.id, "accept"); load(); }}>
+              <CheckIcon size={19} /></button>
+            <button className="danger" style={{ minHeight: 48, minWidth: 52 }}
               aria-label="dispute leave"
               onClick={async () => {
-                await api.staffLeaveRespond(l.id, "dispute"); load(); }}>✖</button>
+                await api.staffLeaveRespond(l.id, "dispute"); load(); }}>
+              <XIcon size={19} /></button>
           </span>
         </div>))}
     </div>
@@ -704,8 +794,11 @@ function LeavePanel() {
   useEffect(() => { load(); }, []);
   if (!items.length) return null;
   return (
-    <div className="card list">
-      <div className="section-head">📋 Staff leave — dual approval</div>
+    <div className="surface" style={{ padding: "4px 16px",
+      marginTop: 16 }}>
+      <div className="section-head" style={{ padding: "0 0" }}>
+        Staff leave — dual approval</div>
+      <div className="list">
       {items.map((l) => (
         <div className="entry" key={l.id}>
           <span className="row">
@@ -718,6 +811,7 @@ function LeavePanel() {
              l.state === "disputed" ? "disputed" : "pending")}>
             {l.state}</span>
         </div>))}
+      </div>
     </div>
   );
 }
@@ -730,38 +824,44 @@ function RemindersPanel({ t }: any) {
   const restock = rems.filter((r) => r.kind === "restock");
   const others = rems.filter((r) => r.kind !== "restock");
   const Tick = ({ id }: { id: number }) => (
-    <button aria-label="mark done"
-      style={{ minHeight: 44, minWidth: 44, fontSize: 18, borderRadius: 12,
-        background: "var(--ok-soft)", color: "var(--ok)",
-        border: "2px solid var(--ok)", fontWeight: 800 }}
-      onClick={async () => { await api.reminderDone(id); load(); }}>✔</button>);
+    <button aria-label="mark done" className="tickbox"
+      onClick={async () => { await api.reminderDone(id); load(); }}>
+      <CheckIcon size={19} /></button>);
   return (
-    <div className="card list">
-      <div className="section-head">📝 {t.restockH}</div>
-      <div className="dim">{t.restockSub}</div>
-      {restock.map((r) => {
-        const p = JSON.parse(r.payload || "{}");
-        return (
+    <>
+      <div className="section-head" style={{ marginTop: 8 }}>{t.restockH}</div>
+      <div className="caption" style={{ marginBottom: 4 }}>{t.restockSub}</div>
+      <div className="surface" style={{ padding: "4px 16px" }}>
+        <div className="list">
+        {restock.map((r) => {
+          const p = JSON.parse(r.payload || "{}");
+          return (
+            <div className="entry" key={r.id}>
+              <span>{(p.items || []).map(
+                (i: any) => `${i.qty} ${i.unit} ${i.name}`).join("; ") ||
+                p.text}</span>
+              <Tick id={r.id} />
+            </div>);
+        })}
+        {!restock.length && (
+          <div className="empty-state"><span className="em">🧺</span>
+            empty — bolo “next time 20 kilo gehu mangwana”</div>)}
+        </div>
+      </div>
+      <div className="section-head">{t.remH}</div>
+      <div className="surface" style={{ padding: "4px 16px" }}>
+        <div className="list">
+        {others.map((r) => (
           <div className="entry" key={r.id}>
-            <span>{(p.items || []).map(
-              (i: any) => `${i.qty} ${i.unit} ${i.name}`).join("; ") ||
-              p.text}</span>
+            <span>{r.customer_name ? `${r.customer_name} ko yaad dilao`
+              : JSON.parse(r.payload || "{}").text}</span>
             <Tick id={r.id} />
-          </div>);
-      })}
-      {!restock.length && (
-        <div className="empty-state"><span className="em">🧺</span>
-          empty — bolo “next time 20 kilo gehu mangwana”</div>)}
-      <div className="section-head">🔔 {t.remH}</div>
-      {others.map((r) => (
-        <div className="entry" key={r.id}>
-          <span>{r.customer_name ? `${r.customer_name} ko yaad dilao`
-            : JSON.parse(r.payload || "{}").text}</span>
-          <Tick id={r.id} />
-        </div>))}
-      {!others.length && <div className="dim">none</div>}
+          </div>))}
+        {!others.length && <div className="empty-state">none</div>}
+        </div>
+      </div>
       <DeliveriesPanel t={t} />
-    </div>
+    </>
   );
 }
 
@@ -781,11 +881,10 @@ function DeliveriesPanel({ t }: any) {
   const dim = new Date(y, m + 1, 0).getDate();
   return (
     <>
-      <div className="section-head">🥛 {t.delH}</div>
+      <div className="section-head">{t.delH}</div>
       {subs.map((s) => (
-        <div key={s.id} className="card" style={{ padding: 14,
-          background: "var(--card2)", boxShadow: "none",
-          borderColor: "transparent" }}>
+        <div key={s.id} className="surface" style={{ padding: "16px 18px",
+          marginBottom: 12 }}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <b>{s.customer} — {s.product} {s.qty_per_day}/{s.unit}/din</b>
             <b className="bal">₹{(s.month_total_paise / 100).toFixed(0)}</b>
@@ -803,12 +902,16 @@ function DeliveriesPanel({ t }: any) {
             })}
           </div>
           <div className="cal-legend">
-            <span>■ delivered</span><span style={{ color: "var(--bad)" }}>
-              ■ skipped</span><span className="dim">■ aage</span>
+            <span className="row" style={{ gap: 5 }}>
+              <i className="dot-st confirmed" /> delivered</span>
+            <span className="row" style={{ gap: 5 }}>
+              <i className="dot-st disputed" /> skipped</span>
+            <span>aage: bolo “doodh nahi chahiye”</span>
           </div>
         </div>))}
-      <div className="audio-note">tap nahi — bolo “Ramesh ka doodh kal se
-        2 din nahi chahiye” ya “dudh ka bill”</div>
+      <div className="caption" style={{ padding: "0 4px" }}>
+        skip karne ke liye bolo “Ramesh ka doodh kal se 2 din nahi chahiye”
+        · bill ke liye “dudh ka bill”</div>
       <WeeklyCard t={t} />
     </>
   );
@@ -820,18 +923,23 @@ function WeeklyCard({ t }: any) {
   if (!w) return null;
   return (
     <>
-      <div className="section-head">📈 {t.weekH}</div>
-      <div className="entry"><span>Top bikri</span>
-        <span>{w.top_sellers.map((x: any) => x.name).join(", ") || "—"}</span></div>
-      {w.running_out.map((r: any) => (
-        <div className="entry" key={r.name}>
-          <span>⚠️ {r.name} khatam</span>
-          <b className="bal due">~{r.days_left} din</b></div>))}
-      {w.top_debtors.map((d: any) => (
-        <div className="entry" key={d.name}>
-          <span>💰 {d.name} udhaar</span>
-          <b className="bal owe">{inr(d.balance_paise)}</b></div>))}
-      <div className="audio-note">bolo “is hafte ka hisaab batao”</div>
+      <div className="section-head">{t.weekH}</div>
+      <div className="surface" style={{ padding: "4px 16px" }}>
+        <div className="list">
+        <div className="entry"><span>Top bikri</span>
+          <span>{w.top_sellers.map((x: any) => x.name).join(", ") || "—"}</span></div>
+        {w.running_out.map((r: any) => (
+          <div className="entry" key={r.name}>
+            <span>{r.name} khatam</span>
+            <b className="bal due">~{r.days_left} din</b></div>))}
+        {w.top_debtors.map((d: any) => (
+          <div className="entry" key={d.name}>
+            <span>{d.name} udhaar</span>
+            <b className="bal owe">{inr(d.balance_paise)}</b></div>))}
+        </div>
+      </div>
+      <div className="caption" style={{ padding: "6px 4px 0" }}>
+        bolo “is hafte ka hisaab batao”</div>
     </>
   );
 }
@@ -861,16 +969,16 @@ function ShopPanel({ t }: any) {
     if (shop) { setBt(shop.business_type);
       setMods(shop.modules || {}); setLabels(shop.config?.labels || {}); }
   }, [shop]);
-  if (!shop) return <div className="card"><div className="skeleton"
+  if (!shop) return <div className="surface"><div className="skeleton"
     style={{ height: 80 }} /></div>;
   return (
-    <div className="card list" style={{ textAlign: "center" }}>
-      <div style={{ fontSize: 20, fontWeight: 800 }}>{shop.name}</div>
+    <div className="surface centre-col" style={{ gap: 14 }}>
+      <div className="title">{shop.name}</div>
       <div className="chip-row" style={{ justifyContent: "center" }}>
         {Object.entries(TYPES).map(([k, [ic, v]]) => (
-          <button key={k} className={"chip" + (bt === k ? " sel" : "")}
+          <button key={k} className="chip"
             style={bt === k ? { background: "var(--primary)",
-              color: "var(--primary-ink)", borderColor: "transparent" } : {}}
+              color: "var(--primary-ink)" } : {}}
             onClick={() => setBt(k)}>{ic} {v}</button>))}
       </div>
       <button className="primary" onClick={async () => {
@@ -902,13 +1010,13 @@ function ShopPanel({ t }: any) {
           {Object.entries(shop.modules).filter(([, v]) => v).map(([k]) => (
             <span key={k} className="pill info">{k}</span>))}
         </div>)}
-      <div className="section-head" style={{ justifyContent: "center" }}>
-        {t.joinQr}</div>
-      {qr && <img className="qr" src={qr} alt="Join QR" width={200} />}
+      <div className="section-head">{t.joinQr}</div>
+      {qr && <div className="qr-tile">
+        <img src={qr} alt="Join QR" width={190} /></div>}
       <div className="confirm-link">
         {typeof window !== "undefined" &&
           `${window.location.origin}/join/${shop.join_code}`}</div>
-      <div className="dim">UPI VPA: {shop.vpa || "—"}</div>
+      <div className="caption">UPI VPA: {shop.vpa || "—"}</div>
     </div>
   );
 }
@@ -921,17 +1029,19 @@ function StockPanel() {
     api.reorder().then(setReo).catch(() => {});
   }, []);
   if (!cat) return (
-    <div className="card list">
+    <div className="surface" style={{ padding: "16px" }}>
+      <div className="list">
       {[0, 1, 2, 3].map((i) =>
         <div key={i} className="skeleton" style={{ height: 40 }} />)}
+      </div>
     </div>);
   const maxStock = Math.max(...cat.products.map((p: any) => p.stock), 1);
   return (
-    <div className="card list">
+    <>
       {reo?.suggestions?.length ? (
         <div className="reorder-card">
           <div style={{ fontWeight: 800, marginBottom: 4 }}>
-            ⚠ Reorder soon</div>
+            Reorder soon</div>
           {reo.suggestions.map((s: any) => (
             <div className="entry" key={s.product_id}>
               <span>{s.name_en} · {s.days_left}d left</span>
@@ -939,23 +1049,27 @@ function StockPanel() {
             </div>))}
         </div>) : null}
       <div className="section-head">Stock</div>
-      {cat.products.map((p: any) => {
-        const low = p.stock <= p.reorder_point;
-        return (
-          <div className="entry" key={p.id}>
-            <span>{icon(p.name_en)} {p.name_en}
-              <span className="dim"> · {inr(p.price_paise)}/{p.unit}</span></span>
-            <span className="row" style={{ gap: 8 }}>
-              <span className={"stockbar" + (low ? " low" : "")}>
-                <i style={{ width: `${Math.max(6,
-                  (p.stock / maxStock) * 100)}%` }} /></span>
-              <span className={low ? "pill disputed" : ""}
-                style={{ minWidth: 64, textAlign: "right", fontWeight: 700,
-                  whiteSpace: "nowrap" }}>
-                {p.stock} {p.unit}</span>
-            </span>
-          </div>);
-      })}
-    </div>
+      <div className="surface" style={{ padding: "4px 16px" }}>
+        <div className="list">
+        {cat.products.map((p: any) => {
+          const low = p.stock <= p.reorder_point;
+          return (
+            <div className="entry" key={p.id}>
+              <span>{icon(p.name_en)} {p.name_en}
+                <span className="dim"> · {inr(p.price_paise)}/{p.unit}</span></span>
+              <span className="row" style={{ gap: 10 }}>
+                <span className={"stockbar" + (low ? " low" : "")}>
+                  <i style={{ width: `${Math.max(6,
+                    (p.stock / maxStock) * 100)}%` }} /></span>
+                <span style={{ minWidth: 62, textAlign: "right",
+                  fontWeight: 700, whiteSpace: "nowrap",
+                  color: low ? "var(--bad)" : undefined }}>
+                  {p.stock} {p.unit}</span>
+              </span>
+            </div>);
+        })}
+        </div>
+      </div>
+    </>
   );
 }

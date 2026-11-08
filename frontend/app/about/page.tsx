@@ -10,13 +10,12 @@ export default function AboutPage() {
   return (
     <main className="no-tabbar">
       <header className="topbar">
-        <div className="brand">
-          <h1 style={{ fontSize: 20 }}>Bolo Khata</h1>
-          <span className="tag">voice-first kirana ledger</span>
+        <div className="wordmark">Bolo Khata
+          <span className="sub">voice-first kirana ledger</span>
         </div>
       </header>
 
-      <div className="card">
+      <div className="surface">
         <h2>📓 The problem</h2>
         <div className="lead" style={{ marginTop: 8, fontSize: 16 }}>
           India's neighbourhood shops still run on a paper udhaar notebook:
@@ -26,7 +25,7 @@ export default function AboutPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="surface">
         <h2>⚡ The hero flow — all live</h2>
         <div className="dim" style={{ margin: "8px 0 4px",
           fontStyle: "italic" }}>
@@ -44,7 +43,7 @@ export default function AboutPage() {
         <div className="audio-note">Telugu works the same way end-to-end.</div>
       </div>
 
-      <div className="card">
+      <div className="surface">
         <h2>🧠 Which Gnani model does what</h2>
         <div style={{ marginTop: 10, display: "flex",
           flexDirection: "column", gap: 10 }}>
@@ -74,7 +73,7 @@ export default function AboutPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="surface">
         <h2>🧩 One voice core, many dukaans</h2>
         <div style={{ marginTop: 10, display: "flex", flexDirection: "column",
           gap: 8, fontSize: 15 }}>
@@ -93,7 +92,7 @@ export default function AboutPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="surface">
         <h2>🏡 Made in Durg–Bhilai</h2>
         <div style={{ marginTop: 8, fontSize: 15 }}>
           Two students at IIT Bhilai. Numbers, not adjectives:{" "}
@@ -107,7 +106,7 @@ export default function AboutPage() {
           full offline mode, voice-cloned shop voice.
         </div>
       </div>
-      <div className="powered">Powered by <b>Gnani AI</b> · Prisma + Timbre</div>
+      <div className="powered">Built with <b>Gnani AI</b> · Prisma + Timbre</div>
     </main>
   );
 }

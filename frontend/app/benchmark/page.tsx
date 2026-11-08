@@ -21,13 +21,12 @@ export default function BenchmarkPage() {
   return (
     <main className="no-tabbar">
       <header className="topbar">
-        <div className="brand">
-          <h1 style={{ fontSize: 20 }}>Benchmark</h1>
-          <span className="tag">real measured numbers, failures included</span>
+        <div className="wordmark">Benchmark
+          <span className="sub">real measured numbers, failures included</span>
         </div>
       </header>
 
-      <div className="card">
+      <div className="surface">
         <h2>Bolo Khata live checks — Prisma v3.0 + Timbre v2.5</h2>
         <div className="dim" style={{ margin: "4px 0 8px" }}>
           Nov 8, real API calls from Durg on consumer broadband</div>
@@ -44,7 +43,7 @@ export default function BenchmarkPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="surface">
         <h2>NoiseLab command benchmark — Prisma v2.5</h2>
         <div className="dim" style={{ margin: "6px 0 12px" }}>
           84 commands × 6 conditions = 504 real API jobs (Oct 2026).
@@ -75,7 +74,7 @@ export default function BenchmarkPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="surface">
         <h2>Honesty notes</h2>
         <div className="dim" style={{ marginTop: 6, fontSize: 14 }}>
           · v2.5 numbers are NoiseLab's published results, re-measured there;
@@ -86,7 +85,7 @@ export default function BenchmarkPage() {
           no cherry-picked numbers.
         </div>
       </div>
-      <div className="powered">Powered by <b>Gnani AI</b> · Prisma + Timbre</div>
+      <div className="powered">Built with <b>Gnani AI</b> · Prisma + Timbre</div>
     </main>
   );
 }

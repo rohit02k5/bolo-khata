@@ -70,3 +70,10 @@ Customer names: రమేష్, రాహుల్, సునీత, లక్�
 - [ ] Voice-note reminder
 - [ ] Month bill + skip confirm
 - [ ] Digit handling in amounts (e.g. 174 → "వంద డెబ్బై నాలుగు"?)
+
+## design-v2 additions (UI chrome, pending ear review)
+- నగదు = Cash · UPI · ఖాతాలో రాయి = Khata me likho
+- ఇప్పుడే చెల్లింపు = Abhi paid · సరే/వద్దు = ok/no · వద్దు = cancel (shared)
+- డార్క్ మోడ్ / లైట్ మోడ్ = theme menu items
+- ఇలా చెప్పండి = "Try saying" · ఈరోజు = "Aaj/Today" · వివరాలు = Details
+- రద్దు = undo · రిఫ్రెష్ = refresh

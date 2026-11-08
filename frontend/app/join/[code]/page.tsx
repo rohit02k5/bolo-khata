@@ -40,12 +40,11 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
   return (
     <main className="no-tabbar">
       <header className="topbar">
-        <div className="brand">
-          <h1 style={{ fontSize: 20 }}>Bolo Khata</h1>
-          <span className="tag">customer join</span>
+        <div className="wordmark">Bolo Khata
+          <span className="sub">customer join</span>
         </div>
       </header>
-      <div className="card list" style={{ padding: "24px 20px" }}>
+      <div className="surface list" style={{ padding: "24px 20px" }}>
         {err && <div className="banner" style={{ borderColor: "var(--bad)",
           background: "var(--bad-soft)" }}><b>Oops</b>{err}</div>}
         {done ? (
@@ -89,7 +88,7 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
           </>
         )}
       </div>
-      <div className="powered">Powered by <b>Gnani AI</b> · Prisma + Timbre</div>
+      <div className="powered">Built with <b>Gnani AI</b> · Prisma + Timbre</div>
     </main>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api, inr, speak, Proposal } from "../lib/api";
+import { SpeakerIcon, CheckIcon } from "../lib/icons";
 
 const SAMPLES = [
   "2 kilo cheeni, 1 Maggi, 500 gram dal, Ramesh ke naam",
@@ -52,23 +53,19 @@ export default function TryPage() {
   return (
     <main className="no-tabbar">
       <header className="topbar">
-        <div className="brand">
-          <h1 style={{ fontSize: 20 }}>Bolo Khata</h1>
-          <span className="tag">judge sandbox — no signup</span>
-        </div>
+        <div className="wordmark">Bolo Khata
+          <span className="sub">judge sandbox</span></div>
       </header>
-      <div className="banner">
-        <b>🧪 Demo data — resets daily.</b>
+      <div className="banner" style={{ marginBottom: 14 }}>
+        <b>Demo data — resets daily.</b>
         Synthetic shop. Parse + ledger run fully here; the mic path uses the
         live Prisma relay. Per-visitor daily cap keeps credit use tiny.
       </div>
-      <div className="card list">
-        <div className="row" style={{ gap: 8 }}>
+      <div className="surface centre-col" style={{ gap: 12,
+        alignItems: "stretch" }}>
+        <div className="seg" style={{ width: "100%" }}>
           {(["hinglish", "te", "en"] as const).map((l) => (
-            <button key={l} className={"chip" + (lang === l ? " sel" : "")}
-              style={lang === l ? { background: "var(--primary)",
-                color: "var(--primary-ink)", borderColor: "transparent",
-                minHeight: 44 } : { minHeight: 44 }}
+            <button key={l} className={lang === l ? "sel grow" : "grow"}
               onClick={() => setLang(l)}>
               {l === "te" ? "తెలుగు" : l === "en" ? "English" : "Hinglish"}
             </button>))}
@@ -78,55 +75,62 @@ export default function TryPage() {
           aria-label="demo command"
           onKeyDown={(e) => e.key === "Enter" && run()} />
         <button className="primary big" disabled={busy}
-          onClick={() => run()}>{busy ? "…" : "Parse →"}</button>
-        <div className="dim">Ek tap se try karo:</div>
+          onClick={() => run()}>{busy ? "…" : "Parse"}</button>
+        <div className="caption">Ek tap se try karo:</div>
         <div className="chip-row">
           {SAMPLES.map((s) => (
             <button key={s} className="chip"
               onClick={() => { setText(s); run(s); }}>{s}</button>))}
         </div>
       </div>
-      {err && <div className="banner" style={{ borderColor: "var(--bad)",
+      {err && <div className="banner" style={{ marginTop: 12,
         background: "var(--bad-soft)" }}><b>Oops</b>{err}</div>}
       {p && (
-        <div className="receipt">
+        <div className="surface" style={{ marginTop: 12 }}>
           <div className="row" style={{ justifyContent: "space-between",
             marginBottom: 8 }}>
             <span className="pill info">
-              {p.kind === "bill" ? "🧾 bill" : "⚙️ " + p.intent}</span>
+              {p.kind === "bill" ? "bill" : p.intent}</span>
             <span className={"conf " + (p.confidence >= 0.85 ? "ok" :
               p.confidence >= 0.6 ? "warn" : "bad")}>
               parse conf {(p.confidence * 100).toFixed(0)}%</span>
-            {p.noise_hint && <span className="noise-chip">🌫 noise</span>}
+            {p.noise_hint && <span className="noise-chip">noise</span>}
           </div>
           {p.kind === "bill" && p.items?.length ? (
-            <table><tbody>
+            <div className="bill-rows">
               {p.items.map((i, idx) => (
-                <tr key={idx} className="slide-in"
-                  style={{ animationDelay: `${idx * 70}ms` }}>
-                  <td className="sr">{idx + 1}.</td>
-                  <td>{ic(i.product_name || i.name)} {i.product_name || i.name}</td>
-                  <td className="num dim">{i.qty} {i.unit}</td>
-                  <td className="num" style={{ fontWeight: 700 }}>
-                    {inr(i.line_total_paise)}</td>
-                </tr>))}
-              <tr className="total-row"><td colSpan={3}>Total</td>
-                <td className="num">{inr(p.total_paise)}</td></tr>
-            </tbody></table>
-          ) : <div style={{ fontSize: 18, margin: "8px 0",
-            fontWeight: 600 }}>{p.description}</div>}
+                <div className="bill-row" key={idx}
+                  style={{ animationDelay: `${idx * 40}ms` }}>
+                  <span className="em">{ic(i.product_name || i.name)}</span>
+                  <span className="nm">{i.product_name || i.name}</span>
+                  <span className="qn">{i.qty} {i.unit}</span>
+                  <span className="amt2">{inr(i.line_total_paise)}</span>
+                </div>))}
+              <div className="bill-total">
+                <span className="lab">Total</span>
+                <span className="amt">{inr(p.total_paise)}</span>
+              </div>
+            </div>
+          ) : <div className="title" style={{ fontSize: 19,
+            margin: "10px 0" }}>{p.description}</div>}
           {p.needs_confirm && (
-            <div className="row wrap" style={{ marginTop: 10 }}>
-              <button className="ok" onClick={() => decide(true, "cash")}>Cash</button>
-              <button className="primary" onClick={() => decide(true, "upi")}>UPI</button>
-              <button className="primary" onClick={() => decide(true, "khata")}>Khata</button>
-              <button className="ghost" onClick={() => decide(false)}>✖</button>
+            <div className="row wrap" style={{ marginTop: 14 }}>
+              <button className="ok grow"
+                onClick={() => decide(true, "cash")}>Cash</button>
+              <button className="primary grow"
+                onClick={() => decide(true, "upi")}>UPI</button>
+              <button className="primary grow"
+                onClick={() => decide(true, "khata")}>Khata</button>
+              <button className="ghost"
+                onClick={() => decide(false)}>✖</button>
             </div>)}
         </div>)}
       {res && (
-        <div className="card celebrate">
+        <div className="surface celebrate" style={{ marginTop: 12 }}>
           <div className="row" style={{ gap: 10 }}>
-            {res.written ? "✔" : "✖"}
+            {res.written
+              ? <CheckIcon size={22} style={{ color: "var(--ok)" }} />
+              : "✖"}
             <b>{res.written ? "written to demo ledger" : "not written"}</b>
           </div>
           {res.confirm_path &&
@@ -134,7 +138,7 @@ export default function TryPage() {
               href={res.confirm_path}>customer confirm link →</a>}
           {res.audio_error && <div className="dim">tts: {res.audio_error}</div>}
         </div>)}
-      <div className="powered">Powered by <b>Gnani AI</b> · Prisma + Timbre</div>
+      <div className="powered">Built with <b>Gnani AI</b> · Prisma + Timbre</div>
     </main>
   );
 }

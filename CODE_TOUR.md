@@ -50,29 +50,33 @@ mic (AudioWorklet, PCM16 @16kHz)
 | Judge sandbox | `/api/try/*`, `frontend/app/try` | own DB, daily reset, 60/day/IP; stash carries its own db |
 | Trust score | `db.trust_scores` | confirmed-share + payment-coverage; a pill, not a verdict |
 
-## UI layer (post-polish)
+## UI layer (design-v2)
 
 | Piece | Files | Notes |
 |---|---|---|
-| Design tokens | `frontend/app/globals.css` | single source: light + `data-theme="dark"` + `prefers-color-scheme`; teal `#0d5f52` on warm paper; `*-soft` semantic tints; 4/8px spacing, 14–24px radii |
-| Fonts | `layout.tsx` + `next/font` | Noto Sans + Devanagari + Telugu self-hosted; tabular-nums for money; `lang="te"` bumps line-height |
-| Theme | `layout.tsx` boot script + 🌙 toggle in `page.tsx` | `bk_theme` localStorage, respects system, zero flash |
-| Mic stage | `page.tsx` `.mic-stage` | real RMS waveform from `mic.ts` worklet (`onLevel`), ring pulse while listening, `.compact` mode keeps proposal CTAs in frame |
-| Receipt card | `.receipt` | torn-edge bill + confirm pages, staggered `slide-in` rows, serial column |
-| Bottom tab bar | `.tabbar` | thumb-zone nav, blur backdrop, safe-area |
-| UPI sheet | `.sheet` | "Abhi paid → Cash \| UPI"; QR + self-reported note in-sheet |
-| Delivery calendar | `.cal` | read-only month grid (delivered/skip/future); skip is voice-only by design — no API added |
-| Voice-note player | `/r/[token]` `.player` | waveform bars fill by real `timeupdate` progress |
+| Design tokens | `frontend/app/globals.css` | single source: light + `data-theme="dark"` + `prefers-color-scheme`; tonal surfaces `--s1/--s2`, hairline `--line`, 3 elevations `--e1/e2/e3`, radius 12/20/28, teal `--primary` + warm `--accent` reserved for the mic/listening |
+| Icon language | `frontend/app/lib/icons.tsx` | inline SVG, 24px grid, 2px stroke round caps; emoji only for product items in bills/stock |
+| Fonts | `layout.tsx` + `next/font` | Noto Sans + Devanagari + Telugu self-hosted; tabular-nums; `lang="te"` bumps line-height to 1.62 |
+| Theme | `layout.tsx` boot script + ⋮ menu item | `bk_theme` localStorage, respects system, zero flash |
+| Counter stage | `page.tsx` `.stage` | calm canvas: transcript → 112px `.big-mic` (gradient, idle `.glow-ring` breathe, `.level-ring` scaled by real RMS, `.wave` bars = RMS) → one-line state caption; `.compact` when a sheet is up |
+| Bill/pay/result | `.sheet` + `.sheet-back` + `.grab` | all transactional moments are bottom sheets; `.cust-head` avatar+caption conf, `.bill-rows` hairline items stagger 40ms, `.bill-total` display type, sticky `.sheet-foot` (Khata primary 56px, Abhi paid secondary, Cancel link) |
+| Khata | `LedgerPanel` | gradient summary hero (display type), search, `.avatar` + `.dot-st` status dots instead of pills |
+| Bottom tab bar | `.tabbar` | 5 line-icon tabs, teal active + 4px accent dot, blur backdrop, safe-area |
+| Topbar/overflow | `.topbar` `.seg` `.menu` | wordmark · language segmented control · ⋮ menu (theme, undo, refresh, sign-out); nothing wraps |
+| Delivery calendar | `.cal` | read-only month grid, delivered/skip/future cells; skip stays voice-only — no API added |
+| Voice-note player | `/r/[token]` `.player` | waveform bars fill by real `timeupdate`, elapsed timer |
 | i18n strings | `T` dict in `page.tsx` | hinglish/te/en chrome copy; Telugu mirrored in TELUGU_REVIEW.md |
 | PWA | `manifest.ts`, `icon.svg`, viewport | standalone display, teal theme colour, safe-area insets, no pinch-zoom |
 | Demo/screenshot hook | `?say=<transcript>` | runs a command without a mic — used for filming + `docs/screens/` |
+| Self-review | `UI_REVIEW.md` | per-screen 1–5 rubric scores before screenshots |
 
-**Interview answer for Rohit:** "The UI is one token file, one easing
-curve, one component vocabulary. The counter screen reads in two seconds:
-transcript on top, mic in the thumb zone, receipt slides in with a torn
-edge. Every number is real — the waveform is RMS from the worklet, the
-player's fill is `timeupdate`, latency is server-reported. Nothing is
-decorated data."
+**Interview answer for Rohit:** "The redesign runs on one contract:
+max two container levels, hairlines over borders, three elevations,
+one icon language, one warm accent reserved for the mic. The counter
+has a single focal point; every transactional moment is a bottom sheet
+in the thumb zone. Every number is real — the waveform is RMS from the
+worklet, the ring scales with mic level, the player's fill is
+`timeupdate`, latency is server-reported. Nothing is decorated data."
 
 ## Per-person interview Q&A
 

@@ -24,3 +24,8 @@
 | 20 | **Delivery calendar is read-only in UI** | `add_skips` exists only on the voice path; the polish task forbids new API surface, so tap-to-skip shows the voice hint instead. Delivered/skipped/future days still rendered per month. |
 | 21 | **`?say=` demo hook kept** | Lets filming/judges drive the counter without a mic; harmless, no writes without confirm. |
 | 22 | **viewport `user-scalable=no` on the counter app** | Trade-off accepted for a kiosk-style one-hand counter (accidental pinch-zoom mid-sale is worse); system font size still enlarges text, focus styles kept. |
+| 23 | **v2: warm accent `#e07a2f` reserved for the ONE action** | Idle mic = teal gradient; listening = warm terracotta. Restraint rules say the accent may only mark the single most important action — on the counter that IS the mic; everywhere else it's only the active-tab dot. |
+| 24 | **v2: bill/pay/result are bottom SHEETS, not inline cards** | Transactional moments belong in the thumb zone with a dimmed canvas behind; keeps the counter screen at one focal point and the CTAs under the thumb. |
+| 25 | **v2: status dots over text pills** | A tiny `.dot-st` carries pending/confirmed/disputed at a glance; text pills reduced to places where the word itself is the content (/try conf, leave states). |
+| 26 | **v2: undo/refresh/theme/sign-out moved into a ⋮ overflow menu** | Topbar stays one calm row (wordmark · language seg · menu); debug-looking controls removed from the hero view for the video. |
+| 27 | **v2: production-build screenshots only** | The dev "N" badge and chunk-cache issues made dev-mode shots dishonest; all review shots + the hero video run on `next start`. |

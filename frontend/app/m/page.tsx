@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, inr, setToken } from "../lib/api";
+import { BookIcon } from "../lib/icons";
 
 export default function MyKhata() {
   const [tok, setTok] = useState("");
@@ -45,17 +46,23 @@ export default function MyKhata() {
     catch (e: any) { setErr(e?.message || "Failed"); }
   }
 
+  const mo = ["Jan","Feb","Mar","Apr","May","Jun",
+    "Jul","Aug","Sep","Oct","Nov","Dec"];
+  const fmtD = (ts: number) => {
+    const d = new Date(ts * 1000);
+    return `${d.getDate()} ${mo[d.getMonth()]} ${d.getFullYear()}`;
+  };
+
   if (!tok) {
     return (
       <main className="no-tabbar">
         <header className="topbar">
-          <div className="brand">
-            <h1 style={{ fontSize: 20 }}>Bolo Khata</h1>
-            <span className="tag">mera khata</span>
-          </div>
+          <div className="wordmark">Bolo Khata
+            <span className="sub">mera khata</span></div>
         </header>
-        <div className="card list" style={{ padding: "24px 20px" }}>
-          <div style={{ fontSize: 40, textAlign: "center" }}>📒</div>
+        <div className="surface centre-col" style={{ gap: 14,
+          padding: "26px 20px" }}>
+          <BookIcon size={36} style={{ color: "var(--primary)" }} />
           <div className="dim" style={{ textAlign: "center" }}>
             Login — naam + 4-digit PIN (dukaan ka QR scan karke banaya tha;
             pehli baar PIN set ho jata hai)</div>
@@ -65,11 +72,11 @@ export default function MyKhata() {
           <input value={pin} onChange={(e) => setPin(e.target.value)}
             placeholder="4-digit PIN" inputMode="numeric" maxLength={4}
             aria-label="4 digit PIN" />
-          <button className="primary big"
+          <button className="primary big" style={{ width: "100%" }}
             disabled={!name.trim() || pin.length !== 4}
-            onClick={login}>Login →</button>
+            onClick={login}>Login</button>
         </div>
-        <div className="powered">Powered by <b>Gnani AI</b> · Prisma + Timbre</div>
+        <div className="powered">Built with <b>Gnani AI</b> · Prisma + Timbre</div>
       </main>
     );
   }
@@ -78,118 +85,126 @@ export default function MyKhata() {
   return (
     <main className="no-tabbar">
       <header className="topbar">
-        <div className="brand">
-          <h1 style={{ fontSize: 20 }}>Bolo Khata</h1>
-          <span className="tag">mera khata</span>
-        </div>
+        <div className="wordmark">Bolo Khata
+          <span className="sub">mera khata</span></div>
       </header>
       {me?.shops?.map((s: any) => (
-        <div className="card" key={s.shop_name}
-          style={{ background: "var(--primary-soft)",
-            borderColor: "transparent" }}>
-          <div className="dim" style={{ fontWeight: 700 }}>{s.shop_name}</div>
-          <div className="hero-num">{inr(s.balance_paise)}</div>
-          <div className="dim">baaki udhaar</div>
+        <div className="surface centre-col" key={s.shop_name}
+          style={{ gap: 4, marginBottom: 12, background:
+            "linear-gradient(140deg, var(--primary-soft), var(--s1) 65%)" }}>
+          <div className="caption">{s.shop_name}</div>
+          <div className="display">{inr(s.balance_paise)}</div>
+          <div className="caption">baaki udhaar</div>
         </div>))}
       {err && <div className="banner"><b>Oops</b>{err}</div>}
 
-      <div className="chip-row">
+      <div className="seg" style={{ width: "100%", marginBottom: 14 }}>
         {(["pending", "hisaab", "kharcha"] as const).map((x) => (
-          <button key={x} className="chip"
-            style={tab === x ? { background: "var(--primary)",
-              color: "var(--primary-ink)", borderColor: "transparent" } : {}}
+          <button key={x} className={tab === x ? "sel grow" : "grow"}
             onClick={() => setTab(x)}>
             {x === "pending"
-              ? `✅ Confirm${pending.length ? ` (${pending.length})` : ""}`
-             : x === "hisaab" ? "📒 Hisaab" : "📊 Kharcha"}
+              ? `Confirm${pending.length ? ` (${pending.length})` : ""}`
+             : x === "hisaab" ? "Hisaab" : "Kharcha"}
           </button>))}
       </div>
 
       {tab === "pending" && (
-        <div className="card list">
+        <>
           {pending.map((p) => (
-            <div key={p.id} className="receipt" style={{ marginBottom: 6 }}>
+            <div key={p.id} className="surface"
+              style={{ marginBottom: 10 }}>
               <div className="row" style={{ justifyContent: "space-between" }}>
                 <b>{p.shop_name}</b>
                 <b className="bal due" style={{ fontSize: 20 }}>
                   {inr(p.amount_paise)}</b>
               </div>
-              <div className="dim">
+              <div className="caption" style={{ marginTop: 4 }}>
                 {(p.items || []).map((i: any) =>
                   `${i.qty} ${i.unit} ${i.name}`).join("; ")}
-                {" · "}{new Date(p.ts * 1000).toLocaleDateString("en-IN")}
+                {" · "}{fmtD(p.ts)}
               </div>
-              <div className="row" style={{ gap: 8, marginTop: 10 }}>
-                <button className="ok grow"
+              <div className="confirm-actions" style={{ marginTop: 12 }}>
+                <button className="ok" style={{ width: "100%" }}
                   onClick={() => respond(p.confirm_token, "confirm")}>
-                  ✔ Sahi hai</button>
-                <button className="danger grow"
+                  Sahi hai</button>
+                <button className="link cancel-link"
                   onClick={() => respond(p.confirm_token, "dispute")}>
-                  ✖ Galat hai</button>
+                  Galat hai — dispute</button>
               </div>
             </div>))}
           {!pending.length && (
-            <div className="empty-state"><span className="em">✅</span>
+            <div className="surface empty-state"><span className="em">✓</span>
               koi pending confirm nahi — sab clear</div>)}
           {!!rems.length &&
-            <div className="section-head">🔔 Dukaan se yaad</div>}
+            <div className="section-head">Dukaan se yaad</div>}
           {rems.map((r) => (
-            <div className="entry" key={r.id}>
-              <span>{r.text}</span>
+            <div className="surface" key={r.id} style={{ marginBottom: 8,
+              padding: "14px 16px" }}>
+              <div>{r.text}</div>
               {r.audio_path && (
                 <audio controls src={r.audio_path}
-                  style={{ height: 36, maxWidth: 150 }} />)}
+                  style={{ height: 36, maxWidth: 220, marginTop: 8 }} />)}
             </div>))}
-        </div>)}
+        </>)}
 
       {tab === "hisaab" && (
-        <div className="card list">
+        <div className="surface" style={{ padding: "4px 16px" }}>
+          <div className="list">
           {ledger.map((e) => (
             <div className="entry" key={e.id}>
-              <span className="row">
-                <span style={{ fontSize: 20 }}>
-                  {e.kind === "payment" ? "💸" : "🛒"}</span>
-                <span>{e.kind === "payment" ? "jama" : e.shop_name}
-                  <span className="dim"> · {new Date(e.ts * 1000)
-                    .toLocaleDateString("en-IN")}
-                    {e.confirm_state !== "none" &&
-                      ` · ${e.confirm_state}`}</span>
-                </span>
+              <span>
+                <b style={{ fontWeight: 600 }}>
+                  {e.kind === "payment" ? "jama" : e.shop_name}</b>
+                <span className="caption"> · {fmtD(e.ts)}
+                  {e.confirm_state !== "none" &&
+                    ` · ${e.confirm_state}`}</span>
               </span>
               <b className={"bal " +
                 (e.kind === "payment" ? "paid" : "owe")}>
                 {e.kind === "payment" ? "−" : ""}{inr(e.amount_paise)}</b>
             </div>))}
           {!ledger.length && (
-            <div className="empty-state"><span className="em">📒</span>
-              koi entry nahi abhi</div>)}
+            <div className="empty-state">koi entry nahi abhi</div>)}
+          </div>
         </div>)}
 
       {tab === "kharcha" && exp && (
-        <div className="card list">
-          <div className="section-head">📅 Roz ka kharcha · last 30 din</div>
-          <div className="bars" role="img"
-            aria-label="daily spend bar chart">
-            {exp.by_day.slice(-14).map((d: any) => (
-              <div className="b" key={d.k}>
-                <i style={{ height: `${(d.total / maxDay) * 92}%` }}
-                  title={`${d.k}: ${inr(d.total)}`} />
-                <span>{d.k.slice(8)}</span>
-              </div>))}
+        <>
+          <div className="section-head" style={{ marginTop: 0 }}>
+            Roz ka kharcha · last 30 din</div>
+          <div className="surface">
+            <div className="bars" role="img"
+              aria-label="daily spend bar chart">
+              {exp.by_day.slice(-14).map((d: any) => (
+                <div className="b" key={d.k}>
+                  <i style={{ height: `${(d.total / maxDay) * 92}%` }}
+                    title={`${d.k}: ${inr(d.total)}`} />
+                  <span>{d.k.slice(8)}</span>
+                </div>))}
+            </div>
           </div>
-          <div className="section-head">🏪 Dukaan-wise</div>
-          {exp.by_shop.map((s: any) => (
-            <div className="entry" key={s.k}>
-              <span>{s.k}</span>
-              <b className="bal">{inr(s.total)}</b>
-            </div>))}
-          <div className="section-head">🗓 Mahina-wise</div>
-          {exp.by_month.map((m: any) => (
-            <div className="entry" key={m.k}>
-              <span>{m.k}</span>
-              <b className="bal">{inr(m.total)}</b>
-            </div>))}
-        </div>)}
+          <div className="section-head">Dukaan-wise</div>
+          <div className="surface" style={{ padding: "4px 16px" }}>
+            <div className="list">
+            {exp.by_shop.map((s: any) => (
+              <div className="entry" key={s.k}>
+                <span>{s.k}</span>
+                <b className="bal">{inr(s.total)}</b>
+              </div>))}
+            </div>
+          </div>
+          <div className="section-head">Mahina-wise</div>
+          <div className="surface" style={{ padding: "4px 16px" }}>
+            <div className="list">
+            {exp.by_month.map((m: any) => (
+              <div className="entry" key={m.k}>
+                <span>{m.k}</span>
+                <b className="bal">{inr(m.total)}</b>
+              </div>))}
+            </div>
+          </div>
+        </>)}
+      <div className="powered">Built with <b>Gnani AI</b> · Prisma + Timbre</div>
     </main>
   );
 }
