@@ -64,6 +64,27 @@ CUSTOMERS = [
 ]
 
 
+def sync_catalog(db) -> None:
+    """Backfill name_hi/name_te/aliases onto an existing catalog so
+    alias additions reach old DBs without reseeding. Idempotent."""
+    for (en, hi, te, aliases, *_rest) in PRODUCTS:
+        row = db.conn.execute(
+            "SELECT id,aliases,name_hi,name_te FROM products "
+            "WHERE name_en=?", (en,)).fetchone()
+        if row is None:
+            continue
+        have = {a.strip() for a in (row["aliases"] or "").split(",")
+                if a.strip()}
+        want = have | {a.strip() for a in aliases.split(",")
+                       if a.strip()}
+        if want != have or not row["name_hi"] or not row["name_te"]:
+            db.conn.execute(
+                "UPDATE products SET aliases=?, name_hi=?, name_te=? "
+                "WHERE id=?",
+                (",".join(sorted(want)), hi, te, row["id"]))
+    db.conn.commit()
+
+
 def seed_subscriptions(db) -> None:
     """Idempotent delivery-subscription backfill (separate from the
     historical-data seed so existing DBs get subs too)."""
@@ -82,6 +103,7 @@ def seed_subscriptions(db) -> None:
 
 def seed(db, *, days: int = 60, rng_seed: int = 42) -> None:
     if db.products():
+        sync_catalog(db)
         seed_subscriptions(db)
         return
     g = np.random.default_rng(rng_seed)

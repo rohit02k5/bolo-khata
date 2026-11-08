@@ -31,6 +31,7 @@ export interface Proposal {
   customer_name?: string | null;
   total_paise?: number;
   lang: string;
+  noise_hint?: boolean;
 }
 
 export interface WriteResult {

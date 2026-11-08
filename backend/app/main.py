@@ -31,6 +31,10 @@ app.add_middleware(
 
 db = ShopDB(config.DB_PATH)
 db.seed_if_empty(seed)
+# idempotent backfills for pre-existing DBs (new aliases, subscriptions)
+from app.seed import sync_catalog, seed_subscriptions
+sync_catalog(db)
+seed_subscriptions(db)
 
 app.include_router(auth.router)
 app.include_router(tts.router)

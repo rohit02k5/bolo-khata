@@ -202,7 +202,11 @@ export default function Home() {
 
         {proposal && (
           <div className="card">
-            <div className="dim">{proposal.intent} · confidence {(proposal.confidence * 100).toFixed(0)}%</div>
+            <div className="dim">{proposal.intent} ·{" "}
+              <span className={"conf " + (proposal.confidence >= 0.85 ? "ok" : proposal.confidence >= 0.6 ? "warn" : "bad")}>
+                parse conf {(proposal.confidence * 100).toFixed(0)}%</span>
+              {proposal.noise_hint && <span className="noise-chip">🌫 noise — check card</span>}
+            </div>
             {proposal.kind === "bill" && proposal.items?.length ? (
               <table>
                 <tbody>
@@ -210,6 +214,7 @@ export default function Home() {
                     <tr key={idx}>
                       <td>{idx + 1}. {icon(i.product_name || i.name)} {i.product_name || i.name}</td>
                       <td>{i.qty} {i.unit}</td>
+                      <td className="num dim">{i.unit_price_paise != null ? `${inr(i.unit_price_paise)}/${i.unit}` : ""}</td>
                       <td className="num">{inr(i.line_total_paise)}</td>
                     </tr>
                   ))}
