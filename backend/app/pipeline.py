@@ -206,12 +206,18 @@ def _delivery_intent(canon: str, transcript: str, lang: str,
                 for i in range(count)]
         desc = (f"{sub['customer_name']} ka {sub['product']} — "
                 f"{days[0]} se {count} din skip")
+        if lang == "te":
+            spoken = (f"{sub['customer_name']} {sub['product']} — "
+                      f"{days[0]} నుండి {count} రోజులు స్కిప్. సరియేనా?")
+        else:
+            spoken = f"{desc}. Sahi hai?"
         pid = _stash("delivery_skip",
                      {"sub_id": sub["id"], "days": days}, transcript, lang)
         return {"proposal_id": pid, "kind": "action",
                 "intent": "delivery_skip", "description": desc,
-                "spoken": f"{desc}. Sahi hai?", "confidence": 0.9,
-                "needs_confirm": True, "unresolved": [], "lang": lang}
+                "spoken": spoken, "confidence": 0.9,
+                "needs_confirm": True, "unresolved": [], "lang": lang,
+                "noise_hint": False}
 
     month_hint = any(h in canon for h in _MONTH_BILL_HINTS) or (
         "bill" in canon.split()
@@ -221,6 +227,7 @@ def _delivery_intent(canon: str, transcript: str, lang: str,
         if not subs:
             return None
         parts = []
+        spoken_parts = []
         for sub in subs:
             b = db.month_bill(sub["id"])
             parts.append(
@@ -228,11 +235,20 @@ def _delivery_intent(canon: str, transcript: str, lang: str,
                 f"{b['month']}: {b['days_billed']} din delivery, "
                 f"{b['days_skipped']} skip, "
                 f"{inr_words(b['total_paise'])}")
+            if lang == "te":
+                spoken_parts.append(
+                    f"{sub['customer_name']} {sub['product']} — "
+                    f"{b['days_billed']} రోజులు డెలివరీ, "
+                    f"{b['days_skipped']} స్కిప్, "
+                    f"{b['total_paise'] // 100} రూపాయలు")
         desc = ". ".join(parts)
+        spoken = (". ".join(spoken_parts) if lang == "te"
+                  else desc) + "."
         return {"proposal_id": "", "kind": "action",
                 "intent": "delivery_month_bill", "description": desc,
-                "spoken": desc + ".", "confidence": 1.0,
-                "needs_confirm": False, "unresolved": [], "lang": lang}
+                "spoken": spoken, "confidence": 1.0,
+                "needs_confirm": False, "unresolved": [], "lang": lang,
+                "noise_hint": False}
     return None
 
 
@@ -255,11 +271,14 @@ def _reminder_or_stockout(transcript: str, lang: str,
         credit = s.get("credit_sale", {}).get("amount_paise", 0)
         desc = (f"Aaj {n} bills — {inr_words(sales)} "
                 f"(udhaar {inr_words(credit)})")
+        spoken = (f"ఈరోజు {n} బిల్లు — {sales // 100} రూపాయలు "
+                  f"(ఉధార్ {credit // 100})" if lang == "te"
+                  else desc)
         return {"proposal_id": "", "kind": "action",
                 "intent": "daily_summary", "description": desc,
-                "spoken": desc + ".", "confidence": 1.0,
+                "spoken": spoken + ".", "confidence": 1.0,
                 "needs_confirm": False, "unresolved": [],
-                "lang": lang}
+                "lang": lang, "noise_hint": False}
 
     if any(h in canon for h in _VOICE_NOTE_HINTS):
         toks_l = canon.split()
@@ -360,6 +379,7 @@ def command_to_proposal(transcript: str, lang: str, db) -> dict:
             "total_paise": bill.total_paise,
             "unresolved": bill.unresolved,
             "lang": lang,
+            "noise_hint": bill.confidence < 0.75 or bool(bill.unresolved),
         }
 
     cmd = parse(transcript, lang)
@@ -380,6 +400,7 @@ def command_to_proposal(transcript: str, lang: str, db) -> dict:
         "error": prop.error,
         "unresolved": [],
         "lang": lang,
+        "noise_hint": (prop.confidence or 1.0) < 0.75 or bool(prop.error),
     }
 
 
