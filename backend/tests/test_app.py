@@ -232,6 +232,36 @@ def test_peek_intent_for_role_gate(db):
     assert P.peek_intent(r["proposal_id"]) in ("undo", "action")
 
 
+def test_business_type_config_validation(db):
+    from app.biztypes import (BUSINESS_TYPES, effective_modules,
+                              type_for_word, validate_config)
+    ok, err = validate_config("milk", {"delivery": True}, {})
+    assert ok
+    assert not validate_config("gym", {}, {})[0]            # unknown type
+    assert not validate_config("milk", {"evil": True}, {})[0]  # unknown mod
+    assert not validate_config("milk", {"stock": "yes"}, {})[0]  # non-bool
+    assert not validate_config("milk", {"ledger": False}, {})[0]  # no ledger
+    assert not validate_config("milk", {},
+                               {"x" * 60: "y"})[0]          # label too long
+    assert type_for_word("doodh") == "milk"
+    assert type_for_word("अखबार") == "newspaper"
+    # delivery module is off for fruit/veg, on for milk
+    assert BUSINESS_TYPES["milk"]["delivery"]
+    assert not BUSINESS_TYPES["fruit_veg"]["delivery"]
+    cfg = {"business_type": "milk", "modules": {"stock": True},
+           "labels": {}}
+    assert effective_modules(cfg)["stock"]                  # overlay works
+    assert effective_modules(cfg)["delivery"]               # preset keeps
+
+
+def test_biztype_voice_intent(db):
+    r = P.command_to_proposal("dukaan type milk set karo", "hinglish", db)
+    assert r["intent"] == "shop_config" and r["needs_confirm"]
+    c = P.confirm(r["proposal_id"], True, db)
+    assert c["written"]
+    assert db.shop_row()["business_type"] == "milk"
+
+
 def test_weekly_insights_intent_and_numbers(db):
     r = P.command_to_proposal("is hafte ka hisaab batao", "hinglish", db)
     assert r["intent"] == "weekly_insights" and not r["needs_confirm"]

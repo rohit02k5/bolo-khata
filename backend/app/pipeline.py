@@ -297,11 +297,41 @@ def _leave_intent(canon: str, transcript: str, lang: str,
             "noise_hint": False}
 
 
+_BIZ_HINTS = ("dukaan type", "business type", "shop type",
+              "dukaan ka type", "store type")
+
+
+def _biztype_intent(canon: str, transcript: str, lang: str,
+                    db) -> dict | None:
+    """'dukaan type milk set karo' -> config proposal (owner writes)."""
+    if not any(h in canon for h in _BIZ_HINTS):
+        return None
+    from app.biztypes import BUSINESS_TYPES, type_for_word
+    btype = next((type_for_word(t) for t in canon.split()
+                  if type_for_word(t)), None)
+    if btype is None:
+        return None
+    mods = [m for m, on in BUSINESS_TYPES[btype].items() if on]
+    desc = (f"Dukaan type '{btype}' set karein? Modules on: "
+            + ", ".join(mods))
+    pid = _stash("shop_config", {"business_type": btype},
+                 transcript, lang)
+    return {"proposal_id": pid, "kind": "action",
+            "intent": "shop_config", "description": desc,
+            "spoken": desc + ". Sahi hai?", "confidence": 0.9,
+            "needs_confirm": True, "unresolved": [], "lang": lang,
+            "noise_hint": False}
+
+
 def _reminder_or_stockout(transcript: str, lang: str,
                           db) -> dict | None:
     """Voice reminders + stock adjust — checked before bill/vendored parse."""
     canon = canonical(transcript)
     toks = set(canon.split())
+
+    bz = _biztype_intent(canon, transcript, lang, db)
+    if bz is not None:
+        return bz
 
     lv = _leave_intent(canon, transcript, lang, db)
     if lv is not None:
@@ -565,6 +595,14 @@ def confirm(proposal_id: str, accept: bool, db, *,
             out["audio_error"] = audio_err
             out["note_text"] = note
         return out
+
+    if entry["kind"] == "shop_config":
+        p = entry["obj"]
+        from app.biztypes import BUSINESS_TYPES
+        db.set_shop_config(p["business_type"],
+                           dict(BUSINESS_TYPES[p["business_type"]]), {})
+        return {"ok": True, "written": True,
+                "spoken": speak_text.done(lang)}
 
     if entry["kind"] == "leave_mark":
         p = entry["obj"]

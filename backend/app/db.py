@@ -183,6 +183,9 @@ class ShopDB:
         if "join_code" not in cols:
             self.conn.execute(
                 "ALTER TABLE shops ADD COLUMN join_code TEXT")
+        if "config_json" not in cols:
+            self.conn.execute(
+                "ALTER TABLE shops ADD COLUMN config_json TEXT DEFAULT ''")
         rcols = {r[1] for r in
                  self.conn.execute("PRAGMA table_info(reminders)")}
         if "token" not in rcols:
@@ -450,6 +453,24 @@ class ShopDB:
     def shop_by_join_code(self, code: str) -> sqlite3.Row | None:
         return self.conn.execute(
             "SELECT * FROM shops WHERE join_code=?", (code,)).fetchone()
+
+    # -------------------------------------------------- business config
+    def shop_config(self) -> dict:
+        row = self.shop_row()
+        cfg = json.loads(row["config_json"]) \
+            if row and row["config_json"] else {}
+        return {"business_type": row["business_type"],
+                "modules": cfg.get("modules", {}),
+                "labels": cfg.get("labels", {})}
+
+    def set_shop_config(self, business_type: str, modules: dict,
+                        labels: dict) -> None:
+        self.conn.execute(
+            "UPDATE shops SET business_type=?, config_json=? WHERE id=?",
+            (business_type,
+             json.dumps({"modules": modules, "labels": labels},
+                        ensure_ascii=False), SHOP_ID))
+        self.conn.commit()
 
     # ------------------------------------------------------------- staff
     def staff(self) -> list[sqlite3.Row]:
