@@ -1,17 +1,19 @@
 // Resolution order: explicit NEXT_PUBLIC_API_URL (prod: the API host),
-// then same-origin (ngrok single-tunnel dev), then localhost:8000.
+// then local dev (any localhost port incl. preview proxies), then
+// same-origin (ngrok single-tunnel / deployed).
 const ENV_API = process.env.NEXT_PUBLIC_API_URL || "";
+const IS_LOCAL = typeof window !== "undefined" &&
+  /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
 export const API =
-  ENV_API ||
-  (typeof window !== "undefined"
-    ? (window.location.port === "3000" ? "http://localhost:8000" : "")
-    : "");
+  ENV_API || (IS_LOCAL ? "http://localhost:8000" : "");
 export const WS_URL = (ENV_API
   ? ENV_API.replace(/^http/, "ws")
-  : (typeof window !== "undefined"
-    ? `${window.location.protocol === "https:" ? "wss" : "ws"}://` +
-      `${window.location.port === "3000" ? "localhost:8000" : window.location.host}`
-    : "ws://localhost:8000")) + "/ws/stt";
+  : (IS_LOCAL
+    ? "ws://localhost:8000"
+    : (typeof window !== "undefined"
+      ? `${window.location.protocol === "https:" ? "wss" : "ws"}://` +
+        window.location.host
+      : "ws://localhost:8000"))) + "/ws/stt";
 
 export interface Proposal {
   proposal_id: string;

@@ -225,20 +225,36 @@ export default function Home() {
     api.summary().then(setSummary).catch(() => {});
   }
 
+  const [loginErr, setLoginErr] = useState("");
+
   async function doLogin() {
-    const r = await api.login(email, pw);
-    setToken(r.token); setTok(r.token); setRole("owner");
-    localStorage.setItem("bk_token", r.token);
-    localStorage.setItem("bk_role", "owner");
-    refresh(r.token);
+    setLoginErr("");
+    try {
+      const r = await api.login(email, pw);
+      setToken(r.token); setTok(r.token); setRole("owner");
+      localStorage.setItem("bk_token", r.token);
+      localStorage.setItem("bk_role", "owner");
+      refresh(r.token);
+    } catch (e: any) {
+      setLoginErr(lang === "te"
+        ? "లాగిన్ కాలేదు — email/password చూడండి"
+        : "Login nahi hua — email/password check karo");
+    }
   }
 
   async function doStaffLogin() {
-    const r = await api.staffLogin(staffName, staffPin);
-    setToken(r.token); setTok(r.token); setRole("staff");
-    localStorage.setItem("bk_token", r.token);
-    localStorage.setItem("bk_role", "staff");
-    refresh(r.token);
+    setLoginErr("");
+    try {
+      const r = await api.staffLogin(staffName, staffPin);
+      setToken(r.token); setTok(r.token); setRole("staff");
+      localStorage.setItem("bk_token", r.token);
+      localStorage.setItem("bk_role", "staff");
+      refresh(r.token);
+    } catch (e: any) {
+      setLoginErr(lang === "te"
+        ? "లాగిన్ కాలేదు — పేరు/PIN చూడండి"
+        : "Login nahi hua — naam/PIN check karo");
+    }
   }
 
   function buzz(p = 12) { try { navigator.vibrate?.(p); } catch {} }
@@ -376,6 +392,9 @@ export default function Home() {
               <button className={loginMode === "staff" ? "sel grow" : "grow"}
                 onClick={() => setLoginMode("staff")}>Staff</button>
             </div>
+            {loginErr && (
+              <div className="banner" style={{ marginBottom: 12,
+                background: "var(--bad-soft)" }}>{loginErr}</div>)}
             {loginMode === "owner" ? (
               <div className="list">
                 <input value={email} onChange={(e) => setEmail(e.target.value)}
