@@ -248,7 +248,10 @@ a:focus-visible {
   line-height: 1.45; display: flex; align-items: center; justify-content: center;
   width: 100%; transition: opacity .3s var(--ease);
 }
-.transcript .ph { color: var(--dim); font-weight: 500; font-size: 16.5px; }
+.transcript .ph { color: var(--dim); font-weight: 400; font-size: 16.5px;
+  opacity: .8; }
+.transcript .try-tag { font-weight: 600; font-size: 13px;
+  letter-spacing: .04em; color: var(--dim); }
 .mic-orbit { position: relative; display: grid; place-items: center; }
 .big-mic {
   width: 112px; height: 112px; border-radius: 50%; border: none;
@@ -300,12 +303,12 @@ a:focus-visible {
 .stage.compact .transcript { min-height: 0; font-size: 15.5px; font-weight: 600; }
 .try-row {
   text-align: center; color: var(--dim); font-size: 14px;
-  padding: 10px 0 2px; line-height: 1.7;
+  padding: 10px 0 2px; line-height: 1.8;
 }
 .try-row b { color: var(--ink2); font-weight: 600; }
 .today-stat {
   text-align: center; color: var(--dim); font-size: 13.5px;
-  padding-bottom: 6px;
+  padding-bottom: 6px; margin-top: 8px;
 }
 .today-stat b { color: var(--ink); font-size: 15px;
   font-variant-numeric: tabular-nums; }
@@ -589,6 +592,13 @@ details.debug summary::-webkit-details-marker { display: none; }
 .receipt tr.slide-in { animation: row-in .3s var(--ease) both; }
 .receipt .total-row td { border-bottom: none; font-weight: 800;
   font-size: 19px; padding-top: 12px; }
+
+@media (max-width: 380px) {
+  main { padding-left: 16px; padding-right: 16px; }
+  .wordmark { font-size: 15px; }
+  .seg button { padding: 5px 9px; font-size: 12px; min-height: 32px; }
+  .topbar { gap: 6px; }
+}
 
 /* ---------- reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {

@@ -466,7 +466,8 @@ export default function Home() {
           <div className="transcript" aria-live="polite">
             {transcript
               ? transcript
-              : <span className="ph">{t.placeholder}</span>}
+              : <span className="ph"><b className="try-tag">Try:</b>{" "}
+                  {t.placeholder}</span>}
           </div>
           <div className={"mic-orbit" + (listening ? " listening" : "")}>
             <span className="glow-ring" aria-hidden="true" />
@@ -478,13 +479,13 @@ export default function Home() {
               {listening ? <StopIcon size={38} /> : <MicIcon size={40} />}
             </button>
           </div>
-          <div className="wave" aria-hidden="true">
-            {levels.map((h, i) => (
-              <i key={i} className="bar"
-                style={{ height: phase === "listening"
-                  ? Math.min(30, h) : 5 }} />
-            ))}
-          </div>
+          {phase === "listening" && (
+            <div className="wave" aria-hidden="true">
+              {levels.map((h, i) => (
+                <i key={i} className="bar"
+                  style={{ height: Math.min(30, h) }} />
+              ))}
+            </div>)}
           <div className="mic-caption">
             {listening ? t.listening :
              phase === "thinking" ? t.thinking :
@@ -495,12 +496,14 @@ export default function Home() {
 
         {!proposal && !result && (<>
           <div className="try-row">
-            <b>{t.tryS}:</b>{" "}
-            {lang === "te"
-              ? "“రెండు కిలో పంచదార” · “రమేష్ ఖాతా” · “ఈ వారం లెక్క”"
+            <b>{t.tryS}:</b>
+            {(lang === "te"
+              ? ["“రెండు కిలో పంచదార”", "“రమేష్ ఖాతా”", "“ఈ వారం లెక్క”"]
               : lang === "en"
-              ? "“2 kilo cheeni” · “Ramesh ka khata” · “weekly summary”"
-              : "“2 kilo cheeni” · “Ramesh ka khata” · “is hafte ka hisaab”"}
+              ? ["“2 kilo cheeni”", "“Ramesh ka khata”", "“weekly summary”"]
+              : ["“2 kilo cheeni”", "“Ramesh ka khata”",
+                 "“is hafte ka hisaab”"]
+            ).map((s) => <div key={s}>{s}</div>)}
           </div>
           {today != null && (
             <div className="today-stat">{t.today}:{" "}

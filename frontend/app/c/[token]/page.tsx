@@ -25,11 +25,32 @@ export default function ConfirmPage({
   const [err, setErr] = useState("");
   const [state, setState] = useState("");
   const [busy, setBusy] = useState(false);
+  const [lang, setLang] = useState("hinglish");
+
+  const T: Record<string, Record<string, string>> = {
+    hinglish: {
+      sub: "khata confirm", entry: "udhaar entry",
+      ok: "Sahi hai — confirm", no: "Galat hai — dispute",
+      done: "Confirmed — shukriya",
+      dis: "Disputed — dukaan ko inform ho gaya",
+      note: "Ye link sirf is entry ke liye hai. Confirm = khata lock. Galat lagta hai to Dispute dabao.",
+      err: "Link invalid ya expired hai — dukaan se naya link maango.",
+    },
+    te: {
+      sub: "ఖాతా నిర్ధారణ", entry: "అప్పు ఎంట్రీ",
+      ok: "సరే — కన్ఫర్మ్", no: "తప్పు — డిస్ప్యూట్",
+      done: "నిర్ధారించబడింది — ధన్యవాదాలు",
+      dis: "డిస్ప్యూట్ — దుకాణానికి తెలిపాం",
+      note: "ఈ లింక్ ఈ ఎంట్రీ కోసమే. కన్ఫర్మ్ = ఖాతా లాక్. తప్పు అనిపిస్తే డిస్ప్యూట్ నొక్కండి.",
+      err: "లింక్ సరికాదు లేదా ముగిసింది — దుకాణం నుండి కొత్త లింక్ అడగండి.",
+    },
+  };
+  const t = T[lang] || T.hinglish;
 
   useEffect(() => {
     api.confirmView(token)
       .then((d) => { setData(d); setState(d.state); })
-      .catch(() => setErr("Link invalid ya expired hai — dukaan se naya link maango."));
+      .catch(() => setErr(t.err));
   }, [token]);
 
   async function respond(action: "confirm" | "dispute") {
@@ -44,7 +65,12 @@ export default function ConfirmPage({
     <main className="no-tabbar">
       <header className="topbar">
         <div className="wordmark">Bolo Khata
-          <span className="sub">customer confirmation</span></div>
+          <span className="sub">{t.sub}</span></div>
+        <div className="seg" role="tablist" aria-label="language">
+          {[["hinglish", "Hinglish"], ["te", "తెలుగు"]].map(([k, l]) => (
+            <button key={k} className={lang === k ? "sel" : ""}
+              onClick={() => setLang(k)}>{l}</button>))}
+        </div>
       </header>
 
       {!data && !err && (
@@ -65,7 +91,7 @@ export default function ConfirmPage({
             <div className="caption">{data.shop_name}</div>
             <div className="display">{inr(data.amount_paise)}</div>
             <div className="caption">
-              udhaar entry · {data.customer_name} · {fmtDate(data.ts)}</div>
+              {t.entry} · {data.customer_name} · {fmtDate(data.ts)}</div>
           </div>
           {data.items?.length ? (
             <div className="bill-rows">
@@ -84,10 +110,10 @@ export default function ConfirmPage({
               <button className="ok big" style={{ width: "100%" }}
                 disabled={busy}
                 onClick={() => respond("confirm")}>
-                Sahi hai — confirm</button>
+                {t.ok}</button>
               <button className="link cancel-link" disabled={busy}
                 onClick={() => respond("dispute")}>
-                Galat hai — dispute</button>
+                {t.no}</button>
             </div>
           ) : (
             <div className="centre-col" style={{ marginTop: 18, gap: 10 }}>
@@ -100,17 +126,16 @@ export default function ConfirmPage({
                     strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <b style={{ fontSize: 19, color: "var(--ok)" }}>
-                  Confirmed — shukriya</b>
+                  {t.done}</b>
               </>) : state === "disputed" ? (
                 <span className="pill disputed" style={{ fontSize: 15,
                   padding: "8px 18px" }}>
-                  Disputed — dukaan ko inform ho gaya</span>
+                  {t.dis}</span>
               ) : <span className={"pill " + state}>{state}</span>}
             </div>)}
           <div className="caption" style={{ marginTop: 16,
             textAlign: "center", lineHeight: 1.6 }}>
-            Ye link sirf is entry ke liye hai. Confirm = khata lock.
-            Galat lagta hai to Dispute dabao.
+            {t.note}
           </div>
         </div>)}
       <div className="powered">Built with <b>Gnani AI</b> · Prisma + Timbre</div>

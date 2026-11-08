@@ -19,7 +19,7 @@ recorded. Everything else can happen after.
 2. Set env vars in the dashboard:
    - `GNANI_API_KEY` = (from backend/.env — do NOT paste in chat/git)
    - `OWNER_EMAIL` = `owner@bolokhata.demo`
-   - `OWNER_PASSWORD` = `bk-9f3Kirana!xZ27` (or rotate: also update .env)
+   - `OWNER_PASSWORD` = (from backend/.env — do NOT paste in git)
    - `SESSION_SECRET` = any long random string
    - `SHOP_VPA` = your UPI id (e.g. `name@upi`) for the QR
    - `CORS_ORIGINS` = your Vercel URL
