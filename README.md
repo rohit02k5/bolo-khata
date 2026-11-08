@@ -41,7 +41,18 @@ Beyond the hero flow, the same voice surface covers:
 - **Daily deliveries** — `"Ramesh ka doodh kal se 2 din nahi chahiye"` →
   skip days; `"dudh ka bill"` → month bill = days-in-month − skips
   (milk/newspaper billing).
-- **Customer onboarding** — join QR at the counter → `/join/[code]`.
+- **Customer onboarding** — join QR at the counter → `/join/[code]`
+  (+optional PIN → full khata app at `/m`: multi-shop balances, pending
+  confirms, expense charts, reminder audio).
+- **Staff** — assistant login (bill/stock only; undo + settings are
+  owner-only server-side); leave = owner-marks, staff-confirms,
+  append-only audit.
+- **Weekly insights** — `"is hafte ka hisaab"` → top sellers, run-out
+  estimates, top debtors, spoken back.
+- **Business types** — kirana / milk / newspaper / fruit-veg / other as
+  schema-validated module configs.
+- **Judge sandbox** — `/try`, no signup, synthetic data, daily reset,
+  per-IP cap.
 - **Undo** — append-only reversal: `"galat, wapas"` / deny after a write.
 - **Checkout** — Cash / **UPI QR** (`upi://` deep link) / Add to Khata.
 
@@ -54,7 +65,7 @@ backend/            FastAPI + vendored bolta/noiselab core
   app/db.py         SQLite ledger: paise, confirm tokens, audit, undo
   app/pipeline.py   transcript -> proposal -> confirm -> write
   app/tts.py        Timbre proxy (REST + SSE), retry on flaky edge
-  tests/            207 tests, all offline
+  tests/            218 tests, all offline
   schema.sql        Postgres/RLS reference for the deploy step
 frontend/           Next.js PWA (mobile-first, dark, captions-friendly)
   app/page.tsx      counter / khata / stock / list / shop tabs, big mic

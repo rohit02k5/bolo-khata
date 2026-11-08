@@ -1,40 +1,40 @@
-# Pitch deck — outline (7 slides)
+# Pitch deck — 5 slides
 
-## 1. Problem
-India's ~60M kiranas run on spoken credit. The ledger lives in memory
-and memory disagrees — with customers, at month-end, forever. Digital
-ledgers failed here because typing at a counter is slower than talking.
+## 1. The udhaar problem
+India's ~60M neighbourhood shops run on spoken credit — "likh dena" —
+remembered by both sides and argued at month-end. Digital ledgers lost
+because typing at a counter is slower than talking. **Talk is the
+interface.**
+[photo: counter, khata book]
 
-## 2. Product
-Bolo Khata: the shopkeeper talks; the ledger updates. One sentence —
-*"2 kilo cheeni, 1 Maggi, 500 gram dal, Ramesh ke naam"* — becomes an
-itemized, spoken-back, customer-confirmed entry. (Screenshot: bill card
-+ mic.)
+## 2. Bolo Khata — speak it, it's settled
+*"2 kilo cheeni, 1 Maggi, 500 gram dal, Ramesh ke naam"* → itemized
+bill → spoken read-back → Cash/UPI/Khata → customer confirms on their
+own phone (Confirm/Dispute). Also: stock, restock lists, voice-note
+reminders, daily/weekly summaries, milk/newspaper skip-day billing,
+undo — one voice surface, no modes.
+[screenshot: mic → bill card → customer confirm]
 
-## 3. Why it's trusted
-Two-sided confirmation — customer gets a link, taps Confirm or Dispute;
-ledger settles on agreement. Append-only, undo-as-reversal, integer
-paise. Not a voice calculator — an *agreed* ledger.
+## 3. Why it's trusted, not just clever
+Two-sided confirmation — the ledger isn't settled until the customer
+says so. Append-only entries, undo-as-reversal, integer paise, token-
+scoped links, staff roles with dual-approval leave. The customer's app
+(/m) shows their khata across shops.
+[diagram: pending → confirmed/disputed]
 
-## 4. Why it works in a real shop (tech)
-- **Prisma streaming**: `indic-auto` code-mixed Hinglish/Telugu,
-  telephonic noise, ~100–180 ms, catalog `keyterms` biasing.
-- **Timbre**: read-backs + voice-note reminders in the owner's language.
-- **Deterministic rules** for extraction: closed grammar, real catalog
-  prices, zero hallucination surface near money. (Full rationale:
-  CODE_TOUR.md.)
+## 4. Why it works in a real shop
+**Gnani Prisma** streams code-mixed Hinglish/Telugu over counter noise —
+`indic-auto` catches mid-sentence language switches, catalog keyterms
+bias it, ~100–180 ms. **Gnani Timbre** speaks confirmations in the
+shopkeeper's language — the step a low-literacy user actually trusts.
+Extraction is **deterministic rules**: closed grammar, real catalog
+prices, zero hallucination surface near money.
+/benchmark: 1,008 real jobs — 88% clean, 87% telephony, failures shown.
 
-## 5. Evidence
-/benchmark: 1,008 real STT jobs — 88.1% action-success clean, 86.9%
-telephony, per-language splits, failure taxonomy shown. 207 offline
-tests. (Screenshot: benchmark page.)
-
-## 6. Breadth
-Bills · khata · UPI QR · stock-in/out · restock checklist · voice-note
-reminders · daily summary · milk/newspaper skip-day billing · undo ·
-customer join QR. One voice surface, no modes.
-
-## 7. Roadmap
-Assistant role + approval flows, multi-shop, WhatsApp Business API
-sends, offline-first PWA queue, regional packs (chemist, tiffin),
-Postgres + RLS (schema ready).
+## 5. Breadth → business
+Module presets per business type: kirana, milk/newspaper delivery
+(delivered-days minus skips), fruit/veg, other (schema-validated
+choices). Contrast deliberately: access businesses like gyms bill
+without absence adjustment. Roadmap: telephony mode, UPI gateway
+verification, full offline, assistant roles at scale.
+IIT Bhilai · built for the Gnani AI Internship Challenge.
