@@ -1,0 +1,12 @@
+.env
+*.db
+data/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.next/
+outputs/
+out.json
+*.log
+relay_test.json
