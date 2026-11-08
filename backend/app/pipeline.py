@@ -18,7 +18,12 @@ from bolta.actions import propose as propose_action
 from bolta.parse import parse
 from bolta.say import say_amount, say_hi, say_hinglish
 
-from app.bill_parse import Bill, parse_bill
+from app.bill_parse import Bill, parse_bill, _find_customer
+from bolta.parse import STOPWORDS
+from bolta.resolve import _match
+import re as _re
+_NUM = _re.compile(r"^\d+(?:\.\d+)?$")
+from noiselab.normalize import canonical
 from app import config, speak_text
 
 _pending: dict[str, dict[str, Any]] = {}
@@ -59,6 +64,10 @@ def _bill_spoken(bill: Bill, lang: str) -> str:
     return f"{who}{n} cheezein, total {words} rupaye. Sahi hai?"
 
 
+def inr_words(paise: int) -> str:
+    return say_hinglish(paise // 100) + " rupaye"
+
+
 def _bill_desc(bill: Bill) -> str:
     lines = [f"{i.qty:g} {i.unit} {i.product_name or i.name}"
              f" — ₹{i.line_total_paise // 100}" for i in bill.items]
@@ -67,8 +76,152 @@ def _bill_desc(bill: Bill) -> str:
     return "; ".join(lines) + f" = ₹{bill.total_paise // 100}{who}"
 
 
+# ----------------------------------------------------------- extra intents
+_RESTOCK_HINTS = ("next time", "agli baar", "list mein", "list me",
+                  "checklist", "note kar", "note kar lo", "yaad rakh",
+                  "mangwana", "order karna", "లిస్ట్", "ఆర్డర్")
+_VOICE_NOTE_HINTS = ("yaad dilao", "yaad dilana", "yaad dila", "remind karo",
+                     "reminder bhejo", "reminder bhej", "యాదు చేయి",
+                     "గుర్తు చేయి")
+_STOCK_OUT_HINTS = ("kharab", "nikala", "nikaal", "nikal diya", "damage",
+                    "expired", "expire", "ghatao", "kam kar do",
+                    "stock kam", "फट गया", "खराब", "చెడిపోయిన")
+_SUMMARY_HINTS = ("aaj ka hisaab", "aaj ka hisab", "aaj ki sale",
+                  "aaj kitna", "aaj ka sale", "today sale", "hisaab batao",
+                  "hisab batao", "hafte ka hisaab", "is hafte", "ఈరోజు")
+_HINT_WORDS = {"next", "time", "agli", "baar", "list", "mein", "me",
+               "checklist", "note", "kar", "lo", "yaad", "rakh",
+               "mangwana", "hai", "order", "karna", "dilao", "dilana",
+               "dila", "remind", "karo", "reminder", "bhejo", "bhej",
+               "kharab", "ho", "gayi", "gaya"}
+
+
+def _non_hint_items(canon: str):
+    from app.bill_parse import _segments, _parse_item
+    items = []
+    for c in _segments(canon.split()):
+        it = _parse_item(c)
+        if it is None:
+            continue
+        if all(w in _HINT_WORDS or w in STOPWORDS for w in it.name.split()):
+            continue
+        items.append(it)
+    return items
+
+
+def _cust_before(tokens: list[str], marker_idx: int):
+    """'<name> ko yaad dilao' -> name is the token before 'ko'."""
+    if marker_idx >= 1:
+        t = tokens[marker_idx - 1]
+        if not _NUM.match(t) and t not in STOPWORDS and t not in _HINT_WORDS:
+            return t
+    return ""
+
+
+def _reminder_or_stockout(transcript: str, lang: str,
+                          db) -> dict | None:
+    """Voice reminders + stock adjust — checked before bill/vendored parse."""
+    canon = canonical(transcript)
+    toks = set(canon.split())
+
+    if any(h in canon for h in _SUMMARY_HINTS):
+        s = db.daily_summary()
+        sales = sum(v["amount_paise"] for k, v in s.items()
+                    if k in ("sale", "credit_sale"))
+        n = sum(v["count"] for k, v in s.items()
+                if k in ("sale", "credit_sale"))
+        credit = s.get("credit_sale", {}).get("amount_paise", 0)
+        desc = (f"Aaj {n} bills — {inr_words(sales)} "
+                f"(udhaar {inr_words(credit)})")
+        return {"proposal_id": "", "kind": "action",
+                "intent": "daily_summary", "description": desc,
+                "spoken": desc + ".", "confidence": 1.0,
+                "needs_confirm": False, "unresolved": [],
+                "lang": lang}
+
+    if any(h in canon for h in _VOICE_NOTE_HINTS):
+        toks_l = canon.split()
+        cust, used = _find_customer(toks_l)
+        if not cust:
+            for i, t in enumerate(toks_l):
+                if t in ("ko", "को", "కు", "కి", "ke", "के") :
+                    cust = _cust_before(toks_l, i) or cust
+        row, score, ties = (None, 0.0, []) if not cust else \
+            _match(cust, db.customers())
+        desc = (f"{row['name']} ko yaad dilana hai"
+                if row else f"'{cust or 'customer'}' ko yaad dilana hai")
+        payload = {"kind": "voice_note", "customer_id":
+                   row["id"] if row else None,
+                   "customer_name": row["name"] if row else cust,
+                   "text": transcript}
+        pid = _stash("reminder", payload, transcript, lang)
+        return {"proposal_id": pid, "kind": "action",
+                "intent": "send_voice_reminder", "description": desc,
+                "spoken": f"{desc}. Sahi hai?", "confidence":
+                0.9 if row else 0.4,
+                "needs_confirm": True, "unresolved":
+                [] if row else [f"customer:{cust or '?'}'"],
+                "lang": lang}
+
+    if any(h in canon for h in _STOCK_OUT_HINTS):
+        items = _non_hint_items(canon)
+        items = _non_hint_items(canon)
+        for it in items:
+            row, score, ties = _match(it.name, db.products())
+            if row is not None:
+                it.product_id, it.product_name, it.score = \
+                    row["id"], row["name_en"], score
+        good = [i for i in items if i.product_id]
+        if good:
+            i0 = good[0]
+            desc = (f"{i0.qty:g} {i0.unit or 'unit'} {i0.product_name} "
+                    "stock se ghata do")
+            payload = {"product_id": i0.product_id, "qty": -abs(i0.qty),
+                       "unit": i0.unit or "piece",
+                       "product_name": i0.product_name}
+            pid = _stash("stock_out", payload, transcript, lang)
+            return {"proposal_id": pid, "kind": "action",
+                    "intent": "stock_out", "description": desc,
+                    "spoken": f"{desc}. Sahi hai?", "confidence": i0.score,
+                    "needs_confirm": True, "unresolved":
+                    [i.name for i in items if not i.product_id],
+                    "lang": lang}
+
+    if any(h in canon for h in _RESTOCK_HINTS):
+        items = _non_hint_items(canon)
+        for it in items:
+            row, score, ties = _match(it.name, db.products())
+            if row is not None:
+                it.product_id, it.product_name, it.score = \
+                    row["id"], row["name_en"], score
+        if items:
+            lines = [f"{i.qty:g} {i.unit or ''} {i.product_name or i.name}"
+                     for i in items]
+            desc = "Restock list: " + "; ".join(lines)
+            payload = {"kind": "restock", "text": transcript,
+                       "items": [{"name": i.product_name or i.name,
+                                  "product_id": i.product_id,
+                                  "qty": i.qty, "unit": i.unit}
+                                 for i in items]}
+            pid = _stash("reminder", payload, transcript, lang)
+            return {"proposal_id": pid, "kind": "action",
+                    "intent": "add_to_shopping_list", "description": desc,
+                    "spoken": "Restock list mein daal diya. Sahi hai?",
+                    "confidence": min((i.score for i in items),
+                                      default=0.0),
+                    "needs_confirm": True,
+                    "unresolved": [i.name for i in items
+                                   if not i.product_id],
+                    "lang": lang}
+    return None
+
+
 def command_to_proposal(transcript: str, lang: str, db) -> dict:
     """Returns a JSON-safe proposal dict (with proposal_id)."""
+    extra = _reminder_or_stockout(transcript, lang, db)
+    if extra is not None:
+        return extra
+
     bill = parse_bill(transcript, db)
     if bill.intent == "add_bill" and bill.items:
         pid = _stash("bill", bill, transcript, lang)
@@ -139,6 +292,21 @@ def confirm(proposal_id: str, accept: bool, db, *,
         if bill.customer_id:
             out["balance_paise"] = db.balance_paise(bill.customer_id)
         return out
+
+    if entry["kind"] == "reminder":
+        p = entry["obj"]
+        rid = db.add_reminder(p["kind"], p, customer_id=p.get("customer_id"))
+        return {"ok": True, "written": True, "reminder_id": rid,
+                "spoken": speak_text.done(lang)}
+
+    if entry["kind"] == "stock_out":
+        p = entry["obj"]
+        tid = db.adjust_stock(
+            p["product_id"], p["qty"], unit=p["unit"],
+            note=entry["transcript"], transcript=entry["transcript"],
+            idempotency_key=f"adj:{proposal_id}")
+        return {"ok": True, "written": True, "txn_id": tid,
+                "spoken": speak_text.done(lang)}
 
     prop = entry["obj"]
     aid = db.propose({"transcript": entry["transcript"],

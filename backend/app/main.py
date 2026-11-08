@@ -105,7 +105,48 @@ def catalog(actor: str = Depends(auth.current_actor)):
 
 @app.get("/api/summary")
 def summary(actor: str = Depends(auth.current_actor)):
-    return db.daily_summary()
+    s = db.daily_summary()
+    sales = sum(v["amount_paise"] for k, v in s.items()
+                if k in ("sale", "credit_sale"))
+    return {"by_kind": s, "total_sales_paise": sales,
+            "pending": [dict(r) for r in db.pending_confirmations()]}
+
+
+# ---------------------------------------------------------------- shop
+@app.get("/api/shop")
+def shop_info(actor: str = Depends(auth.current_actor)):
+    row = db.shop_row()
+    return {"name": row["name"], "business_type": row["business_type"],
+            "vpa": row["vpa"], "join_code": row["join_code"]}
+
+
+@app.get("/api/join/{code}")
+def join_info(code: str):
+    """Public — shop name for the join page. No other data exposed."""
+    shop = db.shop_by_join_code(code)
+    if shop is None:
+        raise HTTPException(404, "invalid join code")
+    return {"shop_name": shop["name"]}
+
+
+class JoinReq(BaseModel):
+    name: str
+    phone: str = ""
+    lang_pref: str = "hinglish"
+
+
+@app.post("/api/join/{code}")
+def join(code: str, req: JoinReq):
+    shop = db.shop_by_join_code(code)
+    if shop is None:
+        raise HTTPException(404, "invalid join code")
+    name = req.name.strip()[:60]
+    if not name:
+        raise HTTPException(400, "name required")
+    cid = db.add_customer(name, phone=req.phone.strip()[:15],
+                          lang_pref=req.lang_pref)
+    return {"ok": True, "customer_id": cid,
+            "shop_name": shop["name"]}
 
 
 # ------------------------------------------------------ customer confirm
@@ -154,23 +195,22 @@ class ReminderReq(BaseModel):
 
 @app.post("/api/reminders")
 def add_reminder(req: ReminderReq, actor: str = Depends(auth.current_actor)):
-    import json as _json
-    db.conn.execute(
-        "INSERT INTO reminders (shop_id,kind,payload,due_at) "
-        "VALUES (?,?,?,?)",
-        (1, req.kind, _json.dumps(
-            {"text": req.text, "product": req.product, "qty": req.qty},
-            ensure_ascii=False), req.due_at or None))
-    db.conn.commit()
-    return {"ok": True}
+    rid = db.add_reminder(
+        req.kind,
+        {"text": req.text, "product": req.product, "qty": req.qty},
+        due_at=req.due_at or None)
+    return {"ok": True, "reminder_id": rid}
 
 
 @app.get("/api/reminders")
 def list_reminders(actor: str = Depends(auth.current_actor)):
-    rows = db.conn.execute(
-        "SELECT * FROM reminders WHERE shop_id=1 AND done=0 "
-        "ORDER BY id DESC").fetchall()
-    return {"reminders": [dict(r) for r in rows]}
+    return {"reminders": [dict(r) for r in db.reminders()]}
+
+
+@app.post("/api/reminders/{reminder_id}/done")
+def reminder_done(reminder_id: int,
+                  actor: str = Depends(auth.current_actor)):
+    return {"ok": db.complete_reminder(reminder_id)}
 
 
 @app.get("/api/reorder")
@@ -187,3 +227,30 @@ def upi_link(amount_paise: int, actor: str = Depends(auth.current_actor)):
     return {"upi": f"upi://pay?pa={vpa}&pn={shop['name']}"
                    f"&am={rupees:.2f}&cu=INR",
             "self_reported": True}
+
+
+# ---------------------------------------------------- single-URL deploy
+# When behind one public tunnel (ngrok free), the backend proxies page
+# traffic to the Next server so a single HTTPS URL serves everything.
+_FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN",
+                                  "http://localhost:3000")
+
+
+@app.api_route("/{full_path:path}",
+               methods=["GET", "HEAD"], include_in_schema=False)
+async def ui_proxy(full_path: str):
+    import httpx
+    from fastapi.responses import Response
+    async with httpx.AsyncClient(base_url=_FRONTEND_ORIGIN,
+                                 timeout=30.0,
+                                 follow_redirects=True) as client:
+        try:
+            r = await client.get("/" + full_path)
+        except httpx.HTTPError as e:
+            raise HTTPException(502, f"frontend unreachable: {e}")
+    hop = {"transfer-encoding", "connection", "content-encoding",
+           "content-length"}
+    headers = {k: v for k, v in r.headers.items()
+               if k.lower() not in hop}
+    return Response(content=r.content, status_code=r.status_code,
+                    headers=headers)

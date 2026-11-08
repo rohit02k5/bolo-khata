@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { api, inr, setToken, speak, WS_URL, Proposal } from "./lib/api";
 import { VoiceSession } from "./lib/mic";
 
@@ -27,7 +28,10 @@ export default function Home() {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [result, setResult] = useState<{ text: string; link?: string } | null>(null);
   const [ledger, setLedger] = useState<any>(null);
-  const [tab, setTab] = useState<"counter" | "ledger" | "stock">("counter");
+  const [summary, setSummary] = useState<any>(null);
+  const [upiQr, setUpiQr] = useState<{ qr: string; link: string } | null>(null);
+  const [tab, setTab] = useState<
+    "counter" | "ledger" | "stock" | "list" | "shop">("counter");
   const [lat, setLat] = useState<{ stt?: number; parse?: number; tts?: number }>({});
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,6 +45,7 @@ export default function Home() {
   function refresh(t = tok) {
     if (!t) return;
     api.ledger().then(setLedger).catch(() => {});
+    api.summary().then(setSummary).catch(() => {});
   }
 
   async function doLogin() {
@@ -110,6 +115,11 @@ export default function Home() {
           text: r.spoken || "Done",
           link,
         });
+        if (method === "upi" && proposal.total_paise) {
+          const u = await api.upi(proposal.total_paise);
+          const qr = await QRCode.toDataURL(u.upi, { width: 240, margin: 1 });
+          setUpiQr({ qr, link: u.upi });
+        } else setUpiQr(null);
         setProposal(null);
         if (r.spoken) speak(r.spoken, lang);
         refresh();
@@ -155,9 +165,13 @@ export default function Home() {
       </header>
 
       <div className="tabs">
-        {(["counter", "ledger", "stock"] as const).map((t) => (
+        {(["counter", "ledger", "stock", "list", "shop"] as const).map((t) => (
           <button key={t} className={tab === t ? "sel" : ""} onClick={() => setTab(t)}>
-            {t === "counter" ? "🎙️ Counter" : t === "ledger" ? "📒 Khata" : "📦 Stock"}
+            {t === "counter" ? "🎙️" : t === "ledger" ? "📒" :
+             t === "stock" ? "📦" : t === "list" ? "📝" : "🏪"}
+            <span className="tab-label">{
+              t === "counter" ? " Counter" : t === "ledger" ? " Khata" :
+              t === "stock" ? " Stock" : t === "list" ? " List" : " Shop"}</span>
           </button>
         ))}
       </div>
@@ -224,6 +238,14 @@ export default function Home() {
         {result && (
           <div className="card">
             <div style={{ fontSize: 17 }}>✅ {result.text}</div>
+            {upiQr && (
+              <div style={{ textAlign: "center", marginTop: 10 }}>
+                <img className="qr" src={upiQr.qr} alt="UPI QR" width={200} />
+                <div className="audio-note">
+                  Customer scans to pay — marked “UPI (self-reported)”
+                </div>
+              </div>
+            )}
             {result.link && (<>
               <div className="dim" style={{ marginTop: 8 }}>Customer confirm link (send via WhatsApp/SMS):</div>
               <a className="confirm-link" href={result.link} target="_blank" rel="noreferrer">{result.link}</a>
@@ -242,6 +264,21 @@ export default function Home() {
 
       {tab === "ledger" && ledger && (
         <div className="card list">
+          {summary && (
+            <div className="card" style={{ background: "var(--card2)" }}>
+              <div className="dim">Aaj ka hisaab</div>
+              <div style={{ fontSize: 24, fontWeight: 700 }}>
+                {inr(summary.total_sales_paise)}
+              </div>
+              <div className="dim">
+                {(Object.entries(summary.by_kind || {}) as
+                  [string, { count: number; amount_paise: number }][])
+                  .map(([k, v]) =>
+                    `${k}: ${v.count} × ${inr(v.amount_paise)}`)
+                  .join(" · ")}
+              </div>
+            </div>
+          )}
           <div className="dim">Pending confirmations</div>
           {ledger.pending?.map((p: any) => (
             <div className="entry" key={p.id}>
@@ -270,9 +307,81 @@ export default function Home() {
       )}
 
       {tab === "stock" && ledger && <StockPanel />}
+      {tab === "list" && <RemindersPanel />}
+      {tab === "shop" && <ShopPanel />}
 
       {toast && <div className="toast">{toast}</div>}
     </main>
+  );
+}
+
+function RemindersPanel() {
+  const [rems, setRems] = useState<any[]>([]);
+  const load = () => api.reminders()
+    .then((r) => setRems(r.reminders)).catch(() => {});
+  useEffect(() => { load(); }, []);
+  const restock = rems.filter((r) => r.kind === "restock");
+  const others = rems.filter((r) => r.kind !== "restock");
+  return (
+    <div className="card list">
+      <div className="dim">📝 Restock checklist (wholesaler aane par)</div>
+      {restock.map((r) => {
+        const p = JSON.parse(r.payload || "{}");
+        return (
+          <div className="entry" key={r.id}>
+            <span>{(p.items || []).map(
+              (i: any) => `${i.qty} ${i.unit} ${i.name}`).join("; ") ||
+              p.text}</span>
+            <button className="ghost" onClick={async () => {
+              await api.reminderDone(r.id); load();
+            }}>✔</button>
+          </div>
+        );
+      })}
+      {!restock.length && <div className="dim">empty — bolo “next time 20 kilo gehu mangwana”</div>}
+      <div className="dim" style={{ marginTop: 10 }}>🔔 Voice reminders</div>
+      {others.map((r) => (
+        <div className="entry" key={r.id}>
+          <span>{r.customer_name ? `${r.customer_name} ko yaad dilao`
+            : JSON.parse(r.payload || "{}").text}</span>
+          <button className="ghost" onClick={async () => {
+            await api.reminderDone(r.id); load();
+          }}>✔</button>
+        </div>
+      ))}
+      {!others.length && <div className="dim">none</div>}
+    </div>
+  );
+}
+
+function ShopPanel() {
+  const [shop, setShop] = useState<any>(null);
+  const [qr, setQr] = useState("");
+  useEffect(() => {
+    api.shop().then(async (s) => {
+      setShop(s);
+      const url = `${window.location.origin}/join/${s.join_code}`;
+      setQr(await QRCode.toDataURL(url, { width: 220, margin: 1 }));
+    }).catch(() => {});
+  }, []);
+  if (!shop) return <div className="card">loading…</div>;
+  return (
+    <div className="card list" style={{ textAlign: "center" }}>
+      <div style={{ fontSize: 18, fontWeight: 700 }}>{shop.name}</div>
+      <div className="row" style={{ justifyContent: "center" }}>
+        <select value={shop.business_type} disabled style={{ width: "auto" }}>
+          <option value="kirana">Kirana</option>
+        </select>
+        <span className="dim">(milk/newspaper — coming soon)</span>
+      </div>
+      <div className="dim">Customer join QR — fixed, dukaan pe chipka do</div>
+      {qr && <img className="qr" src={qr} alt="Join QR" width={200} />}
+      <div className="confirm-link">
+        {typeof window !== "undefined" &&
+          `${window.location.origin}/join/${shop.join_code}`}
+      </div>
+      <div className="dim">UPI VPA: {shop.vpa || "—"}</div>
+    </div>
   );
 }
 

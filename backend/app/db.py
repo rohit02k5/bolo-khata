@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS shops (
     name TEXT NOT NULL,
     business_type TEXT NOT NULL DEFAULT 'kirana',
     vpa TEXT DEFAULT '',
+    join_code TEXT UNIQUE,
     created_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS products (
@@ -117,12 +118,25 @@ class ShopDB:
         self.conn = sqlite3.connect(str(self.path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        # forward-migrations for DBs created by older schemas
+        cols = {r[1] for r in
+                self.conn.execute("PRAGMA table_info(shops)")}
+        if "join_code" not in cols:
+            self.conn.execute(
+                "ALTER TABLE shops ADD COLUMN join_code TEXT")
         if not self.conn.execute("SELECT id FROM shops WHERE id=?",
                                  (SHOP_ID,)).fetchone():
             self.conn.execute(
-                "INSERT INTO shops (id,name,business_type,vpa,created_at)"
-                " VALUES (?,?,?,?,?)", (SHOP_ID, "Sharma Kirana Store",
-                                        "kirana", "", time.time()))
+                "INSERT INTO shops (id,name,business_type,vpa,join_code,"
+                "created_at) VALUES (?,?,?,?,?,?)",
+                (SHOP_ID, "Sharma Kirana Store", "kirana", "",
+                 uuid.uuid4().hex[:12], time.time()))
+        elif not self.conn.execute(
+                "SELECT join_code FROM shops WHERE id=?",
+                (SHOP_ID,)).fetchone()["join_code"]:
+            self.conn.execute(
+                "UPDATE shops SET join_code=? WHERE id=?",
+                (uuid.uuid4().hex[:12], SHOP_ID))
         self.conn.commit()
 
     def close(self) -> None:
@@ -310,6 +324,57 @@ class ShopDB:
                 (self._stock_qty(float(qty), unit, product_id), product_id))
         self.conn.commit()
         return tid
+
+    def adjust_stock(self, product_id: int, delta_qty: float, *,
+                     unit: str = "piece", note: str = "",
+                     source: str = "voice", transcript: str = "",
+                     idempotency_key: str | None = None) -> int:
+        """Stock-out/damage adjust: txn kind 'adjust' + stock update."""
+        tid = self._txn("adjust", product_id=product_id, qty=delta_qty,
+                        unit=unit, note=note, source=source,
+                        transcript=transcript,
+                        idempotency_key=idempotency_key)
+        stock_delta = self._stock_qty(abs(delta_qty), unit, product_id)
+        self.conn.execute(
+            "UPDATE products SET stock = stock + ? WHERE id=?",
+            (stock_delta if delta_qty >= 0 else -stock_delta, product_id))
+        self.conn.commit()
+        return tid
+
+    def add_reminder(self, kind: str, payload: dict, *,
+                     due_at: float | None = None,
+                     customer_id: int | None = None,
+                     audio_path: str = "") -> int:
+        cur = self.conn.execute(
+            "INSERT INTO reminders (shop_id,kind,payload,due_at,"
+            "audio_path,customer_id) VALUES (?,?,?,?,?,?)",
+            (SHOP_ID, kind,
+             json.dumps(payload, ensure_ascii=False), due_at,
+             audio_path, customer_id))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def reminders(self, done: bool = False) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT r.*, c.name AS customer_name FROM reminders r "
+            "LEFT JOIN customers c ON c.id=r.customer_id "
+            "WHERE r.shop_id=? AND r.done=? ORDER BY r.id DESC",
+            (SHOP_ID, int(done))).fetchall()
+
+    def complete_reminder(self, reminder_id: int) -> bool:
+        cur = self.conn.execute(
+            "UPDATE reminders SET done=1 WHERE id=? AND shop_id=?",
+            (reminder_id, SHOP_ID))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def shop_row(self) -> sqlite3.Row:
+        return self.conn.execute(
+            "SELECT * FROM shops WHERE id=?", (SHOP_ID,)).fetchone()
+
+    def shop_by_join_code(self, code: str) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM shops WHERE join_code=?", (code,)).fetchone()
 
     # ------------------------------------------------------------ queries
     def recent(self, limit: int = 30) -> list[sqlite3.Row]:

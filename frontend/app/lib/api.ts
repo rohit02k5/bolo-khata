@@ -1,8 +1,15 @@
+// Same-origin by default: when the app is served behind the single
+// public tunnel, /api/* and /ws/* land on FastAPI directly.
 export const API =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined"
+    ? (window.location.port === "3000" ? "http://localhost:8000" : "")
+    : "");
 export const WS_URL =
-  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(
-    /^http/, "ws") + "/ws/stt";
+  (typeof window !== "undefined"
+    ? `${window.location.protocol === "https:" ? "wss" : "ws"}://` +
+      `${window.location.port === "3000" ? "localhost:8000" : window.location.host}`
+    : "ws://localhost:8000") + "/ws/stt";
 
 export interface Proposal {
   proposal_id: string;
@@ -67,7 +74,18 @@ export const api = {
   upi: (amount_paise: number) =>
     req(`/api/upi?amount_paise=${amount_paise}`),
   reminders: () => req("/api/reminders"),
+  reminderDone: (id: number) =>
+    req(`/api/reminders/${id}/done`, { method: "POST" }),
   reorder: () => req("/api/reorder"),
+  shop: () => req("/api/shop") as Promise<{
+    name: string; business_type: string; vpa: string; join_code: string;
+  }>,
+  joinInfo: (code: string) => req(`/api/join/${code}`),
+  joinShop: (code: string, name: string, phone: string, lang: string) =>
+    req(`/api/join/${code}`, {
+      method: "POST",
+      body: JSON.stringify({ name, phone, lang_pref: lang }),
+    }),
   tts: async (text: string, lang: string): Promise<Blob> => {
     const r = await fetch(API + "/api/tts", {
       method: "POST",
