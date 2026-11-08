@@ -50,3 +50,19 @@ def current_actor(authorization: str = Header(default="")) -> str:
     if info and info[1] > time.time():
         return "owner"
     raise HTTPException(401, "login required")
+
+
+def issue_customer_token(account_id: int) -> str:
+    token = secrets.token_urlsafe(32)
+    _TOKENS[token] = (f"cust:{account_id}", time.time() + _TTL)
+    return token
+
+
+def current_customer(authorization: str = Header(default="")) -> int:
+    """Dependency: returns customer account_id or raises 401."""
+    token = authorization.removeprefix("Bearer ").strip()
+    info = _TOKENS.get(token)
+    if info and info[1] > time.time() and \
+            info[0].startswith("cust:"):
+        return int(info[0].split(":", 1)[1])
+    raise HTTPException(401, "customer login required")

@@ -86,11 +86,21 @@ export const api = {
     name: string; business_type: string; vpa: string; join_code: string;
   }>,
   joinInfo: (code: string) => req(`/api/join/${code}`),
-  joinShop: (code: string, name: string, phone: string, lang: string) =>
+  joinShop: (code: string, name: string, phone: string, lang: string,
+             pin = "") =>
     req(`/api/join/${code}`, {
       method: "POST",
-      body: JSON.stringify({ name, phone, lang_pref: lang }),
+      body: JSON.stringify({ name, phone, lang_pref: lang, pin }),
     }),
+  custLogin: (name: string, pin: string) =>
+    req("/api/me/login", {
+      method: "POST", body: JSON.stringify({ name, pin }),
+    }) as Promise<{ token: string }>,
+  me: () => req("/api/me"),
+  meLedger: () => req("/api/me/ledger"),
+  mePending: () => req("/api/me/pending"),
+  meExpenses: () => req("/api/me/expenses"),
+  meReminders: () => req("/api/me/reminders"),
   tts: async (text: string, lang: string): Promise<Blob> => {
     const r = await fetch(API + "/api/tts", {
       method: "POST",
