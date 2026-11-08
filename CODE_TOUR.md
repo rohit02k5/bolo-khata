@@ -38,6 +38,37 @@ mic (AudioWorklet, PCM16 @16kHz)
 | `frontend/app/page.tsx` | 5 tabs: counter (mic+confirm), ledger, stock, list (restock/reminders/deliveries), shop (join QR, summary). |
 | `backend/app/vendor/` | `bolta` + `noiselab` vendored verbatim from NoiseLab — the hardened parser and its measured-benchmark companion. |
 
+## Newer modules (post-P0)
+
+| Module | Files | Notes |
+|---|---|---|
+| Customer accounts | `db.account_*`, `/api/me/*`, `frontend/app/m` | name+PIN, name-match join links to existing khata rows; multi-shop by design |
+| Delivery billing | `subscriptions`, `delivery_skips`, `_delivery_intent` | month bill = days−skips; ambiguity asks, never guesses |
+| Weekly insights | `db.weekly_insights`, `is hafte` intent | every figure computed from DB; Timbre speaks the template |
+| Staff + leave | `staff`, `leave_requests`, `leave_events`, `require_owner` | assistant bills/stocks; undo/leave/settings owner-only server-side; dual-approval with audit |
+| Business types | `biztypes.py`, `shop_config` | fixed module list, schema-validated; voice `dukaan type X` |
+| Judge sandbox | `/api/try/*`, `frontend/app/try` | own DB, daily reset, 60/day/IP; stash carries its own db |
+| Trust score | `db.trust_scores` | confirmed-share + payment-coverage; a pill, not a verdict |
+
+## Per-person interview Q&A
+
+**For Harshita (voice/core):** "Why keep the rules parser when you had
+benchmark data showing where it fails?" — Because the benchmark told us
+*where* the grammar was thin (Telenglish at 17%), not that rules were
+wrong: the fix was coverage (Telugu units/aliases, romanized forms),
+which is one line per rule and regression-tested. The bolta core is
+vendored verbatim precisely so those measured behaviors survive.
+
+**For Rohit (web/platform):** "What breaks first at scale?" — The
+in-memory proposal stash and token maps (restart loses them — harmless:
+they expire in 5 min/12 h anyway) and SQLite write contention at many
+concurrent owners. `schema.sql` + the module boundaries are drawn so
+Postgres is a swap, not a rewrite.
+
+**For either:** "What would you delete first?" — The `/try` sandbox's
+own DB → a real per-session ephemeral store; and the PIN scheme →
+phone-OTP when a real SMS budget exists.
+
 ## Interview Q&A — "why rules and not an LLM?"
 
 **Q: You have LLM keys. Why is extraction deterministic?**

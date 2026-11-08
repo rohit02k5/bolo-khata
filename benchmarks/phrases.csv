@@ -1,0 +1,21 @@
+id,lang,text,expect_intent,expect_total_paise
+h01,hinglish,2 kilo cheeni 1 Maggi 500 gram dal Ramesh ke naam,add_bill,17400
+h02,hinglish,ek litre tel Sunita ke khate mein,add_bill,18000
+h03,hinglish,Ramesh ne paanch sau rupay diye,record_payment,
+h04,hinglish,chini kitni bachi hai,check_stock,
+h05,hinglish,Ramesh ka kitna baaki hai,check_credit,
+h06,hinglish,20 kilo gehu aaya stock mein,stock_in,
+h07,hinglish,aaj ka hisaab batao,daily_summary,
+h08,hinglish,is hafte ka hisaab batao,weekly_insights,
+h09,hinglish,next time 10 kilo chawal mangwana,restock,
+h10,hinglish,Ramesh ko yaad dilao,voice_note,
+h11,hinglish,Ramesh ka doodh kal se 2 din nahi chahiye,delivery_skip,
+h12,hinglish,Lakshmi ka dudh ka bill batao,delivery_month_bill,
+h13,hinglish,dahi khatam ho gaya,stock_out,
+h14,hinglish,galat wapas karo,undo,
+h15,hinglish,Amit kal chutti pe hai,leave_mark,
+t01,te,రెండు కిలో పంచదార రమేష్ పేరు,add_bill,9000
+t02,te,ఒక ప్యాకెట్ మ్యాగీ సునీత పేరు,add_bill,1400
+t03,te,చక్కెర ఎంత ఉంది,check_stock,
+t04,te,రమేష్ బాకీ ఎంత,check_credit,
+t05,te,రమేష్ గారిని గుర్తు చేయి,voice_note,

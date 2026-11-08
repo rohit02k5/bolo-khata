@@ -1,52 +1,38 @@
-# Demo script (~90 s, two phones)
+# Demo script
 
-**Setup before filming:** owner phone = app + logged in; customer phone =
-second phone, WhatsApp/browser ready. Backend warm (see
-FINAL_CHECKLIST.md wake-up). Room ambient shop noise is *good* — that's
-the point.
+Two versions: **A) 75 s full** and **B) 60 s cut**. Two phones.
+Nothing mocked — every number on screen is live.
 
-## 0:00–0:10 — Frame
+**Setup:** owner phone logged in, backend warm (FINAL_CHECKLIST),
+customer = second phone. Captions in Hindi/Telugu as spoken, English
+subtitles below.
 
-"India runs on kirana udhaar — spoken, remembered, argued about. Bolo
-Khata turns that speech into a trusted ledger."
+## A) 75 s
 
-## 0:10–0:35 — Hero bill (owner phone)
+| t | Action | Voiceover / caption |
+|---|---|---|
+| 0–8 | Exterior/interior kirana, owner at counter | "60 million kiranas run on spoken udhaar. Memory argues back. Bolo Khata makes the ledger listen." / "भारत की दुकानें उधार पर चलती हैं।" |
+| 8–28 | Hold mic: **"2 kilo cheeni, 1 Maggi, 500 gram dal, Ramesh ke naam"** → live transcript → itemized card ₹174 → Timbre read-back | "Bolo — Prisma hears code-mixed Hindi over shop noise. Rules turn it into a priced bill. Timbre says it back." / "बोलिए — दुकान के शोर में भी।" |
+| 28–38 | Tap **Khata** → stock ticks down | "One tap: khata, cash, or UPI QR — stock moves with real units." |
+| 38–52 | Customer phone opens `/c/[token]` → same bill → taps **Confirm** → owner screen flips pending→confirmed | "The customer confirms on their own phone. Udhaar becomes agreed, not argued." / "ग्राहक अपने फ़ोन पर पुष्टि करता है।" |
+| 52–64 | Owner: **"Ramesh ka doodh kal se 2 din nahi chahiye"** → confirm → **"dudh ka bill"** → ₹ adjusted live | "Skip-day billing — milk and newspaper math a milkman already does in his head." |
+| 64–75 | `/benchmark` on screen → close | "1,008 real speech jobs measured. Prisma + Timbre carry the voice; rules carry the money. Bolo Khata — IIT Bhilai." |
 
-1. Hold mic. Say, at normal counter volume:
-   **"2 kilo cheeni, 1 Maggi, 500 gram dal, Ramesh ke naam"**
-2. Point at: live transcript → itemized card (sr / item / qty / price /
-   ₹174) → Timbre reads it back in Hinglish.
-3. Tap **Khata**. Note stock ticks down.
+## B) 60 s cut
 
-## 0:35–0:55 — Two-sided trust (customer phone)
+Drop the delivery section (52–64) and compress intro to 5 s:
+problem → hero bill → customer confirm → benchmark close.
 
-4. "Ramesh gets a link on his phone." Open `/c/[token]` on the second
-   phone — shows the exact same bill.
-5. Tap **Confirm**. Cut back to owner phone: entry flips
-   pending → confirmed, balance updates.
-   *(Alt take: tap Dispute → show disputed state + undo.)*
+## Telugu variant (swap-in for judge reel)
 
-## 0:55–1:15 — Breadth (owner phone, rapid-fire)
+At 8–28 instead: **"రెండు కిలో పంచదార, రమేష్ పేరు"** → same card →
+Telugu read-back. Shows `indic-auto` switching languages mid-demo.
 
-6. **"chini kitni bachi hai"** → spoken answer.
-7. **"Ramesh ka doodh kal se 2 din nahi chahiye"** → confirm →
-   **"dudh ka bill"** → month bill adjusts live.
-8. **"Ramesh ko yaad dilao"** → voice-note link → play the Timbre audio
-   on the customer phone.
-9. **"galat, wapas"** → undo reverses the last write; stock restored.
+## Failure fallbacks
 
-## 1:15–1:30 — Close
-
-10. Switch to `/benchmark`: "1,008 real Prisma jobs measured — 88%
-    action-success clean, 87% on telephony audio. And the whole
-    understanding layer is rules — because near money, deterministic is
-    a feature." Name the models: **Prisma + Timbre**.
-
-## Fallbacks
-
-- If live STT hiccups: same commands are in `commands.json`; the Streamlit
-  fallback in `NoiseLab/` reproduces the ledger demo offline.
-- If TTS stalls: tap the speaker icon again — `tts.py` retries; worst
-  case, read the card aloud and continue.
-- If the tunnel/host dies mid-take: restart per FINAL_CHECKLIST and
-  resume from step 4 — ledger state persists in SQLite.
+- STT hiccup → same phrases in `commands.json`; Streamlit fallback
+  (`NoiseLab/bolta_app.py`) reproduces the ledger offline.
+- TTS stall → tap speaker again (`tts.py` retries); worst case read
+  the card aloud, keep going.
+- Site down → restart per FINAL_CHECKLIST; ledger persists in SQLite,
+  resume mid-flow.
