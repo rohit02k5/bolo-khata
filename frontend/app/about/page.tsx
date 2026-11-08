@@ -40,12 +40,32 @@ export default function AboutPage() {
       </div>
 
       <div className="card">
+        <b>Business types</b>
+        <div className="dim" style={{ marginTop: 6 }}>
+          The same voice core runs as module presets: <b>Kirana</b> (all
+          modules), <b>Milk</b> and <b>Newspaper delivery</b>
+          (delivery-billing: month bill = delivered days − skips),
+          <b>Fruit/veg</b> (ledger + stock, no subscriptions), and
+          <b>Other</b> — the owner picks from a fixed module list and can
+          rename labels/units; output is schema-validated, no free-form
+          schema edits.
+          <br /><br />
+          <b>Deliberate contrast:</b> subscription businesses that bill
+          for <i>access</i>, not deliveries — gyms, memberships — do NOT
+          get absence-adjusted billing. A missed gym day still bills.
+          Delivery businesses bill for goods actually delivered, so
+          skips reduce the bill. Different economics, different modules —
+          same parser.
+        </div>
+      </div>
+
+      <div className="card">
         <b>Made in Durg–Bhilai</b>
         <div className="dim" style={{ marginTop: 6 }}>
           Two students at IIT Bhilai. Benchmarks: <a href="/benchmark"
           style={{ color: "var(--info)" }}>/benchmark</a>.
-          Roadmap: milk/newspaper skip-day billing, customer multi-shop
-          khata, phone-call mode via telephony.
+          Roadmap: phone-call/telephony mode, UPI gateway verification,
+          full offline mode, voice-cloned shop voice.
         </div>
       </div>
     </main>

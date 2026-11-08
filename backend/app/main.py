@@ -68,7 +68,7 @@ def command(req: CommandReq, actor: str = Depends(auth.current_actor)):
     return pipeline.command_to_proposal(req.transcript, req.lang, db)
 
 
-_STAFF_FORBIDDEN_INTENTS = {"undo", "leave_mark"}
+_STAFF_FORBIDDEN_INTENTS = {"undo", "leave_mark", "shop_config"}
 
 
 @app.post("/api/confirm")
@@ -130,8 +130,29 @@ def summary(actor: str = Depends(auth.current_actor)):
 @app.get("/api/shop")
 def shop_info(actor: str = Depends(auth.current_actor)):
     row = db.shop_row()
+    cfg = db.shop_config()
+    from app.biztypes import effective_modules
     return {"name": row["name"], "business_type": row["business_type"],
-            "vpa": row["vpa"], "join_code": row["join_code"]}
+            "vpa": row["vpa"], "join_code": row["join_code"],
+            "config": cfg, "modules": effective_modules(cfg)}
+
+
+class ShopConfigReq(BaseModel):
+    business_type: str
+    modules: dict = {}
+    labels: dict = {}
+
+
+@app.post("/api/shop/config")
+def shop_config_set(req: ShopConfigReq,
+                    actor: str = Depends(auth.require_owner)):
+    from app.biztypes import validate_config
+    ok, err = validate_config(req.business_type, req.modules,
+                              req.labels)
+    if not ok:
+        raise HTTPException(400, err)
+    db.set_shop_config(req.business_type, req.modules, req.labels)
+    return {"ok": True}
 
 
 @app.get("/api/join/{code}")

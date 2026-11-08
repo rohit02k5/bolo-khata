@@ -94,7 +94,15 @@ export const api = {
   leave: () => req("/api/leave"),
   shop: () => req("/api/shop") as Promise<{
     name: string; business_type: string; vpa: string; join_code: string;
+    config?: any; modules?: Record<string, boolean>;
   }>,
+  setShopConfig: (business_type: string,
+                  modules: Record<string, boolean>,
+                  labels: Record<string, string>) =>
+    req("/api/shop/config", {
+      method: "POST",
+      body: JSON.stringify({ business_type, modules, labels }),
+    }),
   joinInfo: (code: string) => req(`/api/join/${code}`),
   joinShop: (code: string, name: string, phone: string, lang: string,
              pin = "") =>

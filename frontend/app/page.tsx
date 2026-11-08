@@ -450,10 +450,15 @@ function RemindersPanel() {
 
 function DeliveriesPanel() {
   const [subs, setSubs] = useState<any[]>([]);
+  const [on, setOn] = useState(true);
   const load = () => api.deliveries()
     .then((r) => setSubs(r.subscriptions)).catch(() => {});
-  useEffect(() => { load(); }, []);
-  if (!subs.length) return null;
+  useEffect(() => {
+    load();
+    api.shop().then((s) =>
+      setOn(s.modules?.delivery !== false)).catch(() => {});
+  }, []);
+  if (!on || !subs.length) return null;
   return (
     <>
       <div className="dim" style={{ marginTop: 10 }}>🥛 Daily deliveries</div>
@@ -506,16 +511,62 @@ function ShopPanel() {
       setQr(await QRCode.toDataURL(url, { width: 220, margin: 1 }));
     }).catch(() => {});
   }, []);
+  const TYPES: Record<string, string> = {
+    kirana: "Kirana", milk: "Milk delivery",
+    newspaper: "Newspaper delivery", fruit_veg: "Fruit/veg vendor",
+    other: "Other",
+  };
+  const ALL_MODS = ["ledger", "stock", "billing", "delivery", "staff",
+                    "reminders", "upi"];
+  const [bt, setBt] = useState("");
+  const [mods, setMods] = useState<Record<string, boolean>>({});
+  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [saved, setSaved] = useState("");
+  useEffect(() => {
+    if (shop) { setBt(shop.business_type);
+      setMods(shop.modules || {}); setLabels(shop.config?.labels || {}); }
+  }, [shop]);
   if (!shop) return <div className="card">loading…</div>;
   return (
     <div className="card list" style={{ textAlign: "center" }}>
       <div style={{ fontSize: 18, fontWeight: 700 }}>{shop.name}</div>
       <div className="row" style={{ justifyContent: "center" }}>
-        <select value={shop.business_type} disabled style={{ width: "auto" }}>
-          <option value="kirana">Kirana</option>
+        <select value={bt} style={{ width: "auto" }}
+          onChange={(e) => setBt(e.target.value)}>
+          {Object.entries(TYPES).map(([k, v]) =>
+            <option key={k} value={k}>{v}</option>)}
         </select>
-        <span className="dim">(milk/newspaper — coming soon)</span>
+        <button className="primary" style={{ padding: "4px 14px" }}
+          onClick={async () => {
+            try {
+              await api.setShopConfig(bt, bt === "other" ? mods : {}, labels);
+              setSaved("saved ✔");
+              const s = await api.shop(); setShop(s);
+            } catch (e: any) { setSaved(e?.message || "failed"); }
+          }}>Save</button>
       </div>
+      {saved && <div className="dim">{saved}</div>}
+      {bt === "other" && (
+        <div style={{ textAlign: "left" }}>
+          <div className="dim">Modules (fixed list — pick what fits):</div>
+          {ALL_MODS.filter((m) => m !== "ledger").map((m) => (
+            <label key={m} className="row" style={{ gap: 8 }}>
+              <input type="checkbox" checked={!!mods[m]}
+                onChange={(e) =>
+                  setMods({ ...mods, [m]: e.target.checked })} />
+              {m}
+            </label>
+          ))}
+          <div className="dim">Labels (optional rename):</div>
+          <input placeholder="e.g. item = dibba"
+            value={labels.item || ""}
+            onChange={(e) => setLabels({ ...labels, item: e.target.value })} />
+        </div>
+      )}
+      {bt !== "other" && shop.modules && (
+        <div className="dim">On: {Object.entries(shop.modules)
+          .filter(([, v]) => v).map(([k]) => k).join(" · ")}</div>
+      )}
       <div className="dim">Customer join QR — fixed, dukaan pe chipka do</div>
       {qr && <img className="qr" src={qr} alt="Join QR" width={200} />}
       <div className="confirm-link">
