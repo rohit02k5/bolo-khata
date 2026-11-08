@@ -105,6 +105,99 @@ def _bill_desc(bill: Bill) -> str:
     return "; ".join(lines) + f" = ₹{bill.total_paise // 100}{who}"
 
 
+def edit_bill(items: list[dict], db, *, customer_id: int | None = None,
+              customer_name: str = "", lang: str = "hinglish",
+              transcript: str = "", allow_price_override: bool = True,
+              ) -> dict | None:
+    """Rebuild a bill proposal from owner/staff edits.
+
+    Every line is re-validated against the catalog: product_id resolves
+    the row, `name` fuzzy-matches when no id is given, qty must be > 0,
+    and prices come from the catalog unless the actor may override them.
+    Totals recompute in integer paise; the result is stashed like a
+    spoken proposal, so confirm writes the edited version."""
+    from app.bill_parse import Bill, BillItem, _TO_BASE, _convert
+
+    bill = Bill(raw=transcript)
+    unresolved: list[str] = []
+    for it in items:
+        name = (it.get("name") or "").strip()[:60]
+        pid = it.get("product_id")
+        qty = float(it.get("qty") or 0)
+        unit = (it.get("unit") or "").strip()[:20]
+        if qty <= 0:
+            continue
+        bi = BillItem(name=name, qty=qty, unit=unit)
+        row = None
+        if pid:
+            row = db.conn.execute(
+                "SELECT * FROM products WHERE id=? AND shop_id=?",
+                (pid, db.shop_id)).fetchone()
+            bi.score = 1.0
+        if row is None and name:
+            row, score, ties = _match(name, db.products())
+            bi.score = score
+            if ties and row is not None:
+                bi.options = [t["name_en"] for t in [row] + ties]
+            elif ties:
+                bi.options = [r["name_en"] for r in ties]
+        if row is None:
+            if name:
+                unresolved.append(name)
+                bill.items.append(bi)   # keep visible as unresolved
+            continue
+        bi.product_id = row["id"]
+        bi.product_name = row["name_en"]
+        base_unit = row["unit"] or "piece"
+        bi.unit = unit or base_unit
+        catalog_price = db.price_paise(row["id"])
+        base_price = int(round(
+            catalog_price * _TO_BASE[(bi.unit, base_unit)])) \
+            if (bi.unit, base_unit) in _TO_BASE else catalog_price
+        bi.unit_price_paise = base_price
+        # price overrides are an owner power; staff edits reprice to catalog
+        override = it.get("unit_price_paise")
+        if allow_price_override and override is not None \
+                and int(override) != base_price:
+            bi.unit_price_paise = max(0, int(override))
+        qty_base = _convert(qty, bi.unit, base_unit)
+        bi.line_total_paise = int(round(qty_base * catalog_price)) \
+            if bi.unit_price_paise == base_price else \
+            int(round(qty * bi.unit_price_paise))
+        bill.items.append(bi)
+
+    if not bill.items:
+        return None
+    bill.customer_id = customer_id
+    if customer_id:
+        row = db.conn.execute(
+            "SELECT name FROM customers WHERE id=? AND shop_id=?",
+            (customer_id, db.shop_id)).fetchone()
+        bill.customer_name = row["name"] if row else ""
+        bill.customer = bill.customer_name
+    elif customer_name:
+        bill.customer = customer_name.strip()[:60]
+        unresolved.append(f"customer:{bill.customer}")
+    bill.total_paise = sum(i.line_total_paise for i in bill.items)
+    bill.unresolved = unresolved
+    scores = [i.score for i in bill.items if i.product_id]
+    bill.confidence = min(scores) if scores else 0.4
+    if unresolved:
+        bill.confidence = min(bill.confidence, 0.4)
+    pid = _stash("bill", bill, transcript or "(edited)", lang, db)
+    return {
+        "proposal_id": pid, "kind": "bill", "intent": "add_bill",
+        "description": _bill_desc(bill), "spoken": _bill_spoken(bill, lang),
+        "confidence": bill.confidence, "needs_confirm": True,
+        "items": [asdict(i) for i in bill.items],
+        "customer_id": bill.customer_id,
+        "customer_name": bill.customer_name or bill.customer,
+        "customer_options": bill.customer_options,
+        "total_paise": bill.total_paise, "unresolved": unresolved,
+        "lang": lang, "edited": True,
+        "noise_hint": bool(unresolved)}
+
+
 # ----------------------------------------------------------- extra intents
 _RESTOCK_HINTS = ("next time", "agli baar", "list mein", "list me",
                   "checklist", "note kar", "note kar lo", "yaad rakh",

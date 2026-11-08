@@ -26,14 +26,17 @@ export interface Proposal {
   error?: string;
   unresolved: string[];
   items?: {
-    product_name?: string; name: string; qty: number; unit: string;
+    product_id?: number | null; product_name?: string; name: string;
+    qty: number; unit: string;
     unit_price_paise: number; line_total_paise: number; score: number;
+    options?: string[];
   }[];
   customer_id?: number | null;
   customer_name?: string | null;
   total_paise?: number;
   lang: string;
   noise_hint?: boolean;
+  edited?: boolean;
 }
 
 export interface WriteResult {
@@ -64,6 +67,66 @@ export const api = {
     req("/api/login", {
       method: "POST", body: JSON.stringify({ email, password }),
     }) as Promise<{ token: string; role: string }>,
+  signup: (email: string, password: string, name: string) =>
+    req("/api/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password, name }),
+    }) as Promise<{ token: string; role: string; shop_id: number;
+      needs_onboarding: boolean }>,
+  sessionLogin: (email: string, password: string) =>
+    req("/api/session/login", {
+      method: "POST", body: JSON.stringify({ email, password }),
+    }) as Promise<{ token: string; role: string; shop_id: number;
+      needs_onboarding: boolean }>,
+  session: () =>
+    req("/api/session") as Promise<{ actor: string; role: string;
+      shop_id: number; shop_name?: string; needs_onboarding: boolean }>,
+  shopSetup: (body: { name: string; business_type: string; vpa?: string;
+    city?: string; modules?: Record<string, boolean>;
+    labels?: Record<string, string>; starter?: boolean;
+    catalog?: any[] }) =>
+    req("/api/shop/setup", {
+      method: "POST", body: JSON.stringify(body),
+    }) as Promise<{ ok: boolean; shop_id: number; name: string;
+      join_code: string; business_type: string; token: string }>,
+  billEdit: (items: any[], opts: { customer_id?: number | null;
+    customer_name?: string; lang?: string; transcript?: string }) =>
+    req("/api/bill/edit", {
+      method: "POST",
+      body: JSON.stringify({ items, ...opts }),
+    }) as Promise<Proposal>,
+  addProduct: (p: { name_en: string; name_hi?: string; name_te?: string;
+    aliases?: string; unit?: string; price_paise?: number;
+    stock?: number }) =>
+    req("/api/products", {
+      method: "POST", body: JSON.stringify(p),
+    }) as Promise<{ ok: boolean; product: any }>,
+  editProduct: (id: number, p: { name_en: string; unit?: string;
+    price_paise?: number; stock?: number }) =>
+    req(`/api/products/${id}`, {
+      method: "PATCH", body: JSON.stringify(p),
+    }),
+  addCustomer: (name: string, phone = "", lang_pref = "hinglish") =>
+    req("/api/customers", {
+      method: "POST",
+      body: JSON.stringify({ name, phone, lang_pref }),
+    }) as Promise<{ ok: boolean; customer: any; existed?: boolean }>,
+  staffInvite: (name: string) =>
+    req("/api/staff/invite", {
+      method: "POST", body: JSON.stringify({ name }),
+    }) as Promise<{ ok: boolean; name: string; invite_code: string }>,
+  staffRegister: (invite_code: string, pin: string) =>
+    req("/api/staff/register", {
+      method: "POST", body: JSON.stringify({ invite_code, pin }),
+    }) as Promise<{ token: string; staff_id: number; role: string;
+      shop_id: number; name: string }>,
+  custSignup: (name: string, pin: string, contact = "",
+               join_code = "") =>
+    req("/api/me/signup", {
+      method: "POST",
+      body: JSON.stringify({ name, pin, contact, join_code }),
+    }) as Promise<{ token: string; account_id: number;
+      customer_id?: number; shop_name?: string }>,
   command: (transcript: string, lang: string) =>
     req("/api/command", {
       method: "POST", body: JSON.stringify({ transcript, lang }),

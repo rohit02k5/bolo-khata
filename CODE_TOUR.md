@@ -34,8 +34,10 @@ mic (AudioWorklet, PCM16 @16kHz)
 | `backend/app/pipeline.py` | Intent dispatch order: reminders/delivery → multi-item bill → vendored single intents (payment, stock, queries, undo). Stashes proposals; `confirm()` is the only write path. |
 | `backend/app/db.py` | SQLite ledger. Integer paise everywhere. `transactions` + `txn_items` + stock movements + confirm tokens + reminders + subscriptions/delivery_skips. Idempotent writes. |
 | `backend/app/tts.py` | Timbre REST with retry-on-reset; language→voice map (Poorvi `hi-en`, Suhana `te-IN`). |
-| `frontend/app/lib/mic.ts` | getUserMedia → AudioWorklet → Float32→PCM16 @16 kHz → binary WS frames + `commit` on stop. |
-| `frontend/app/page.tsx` | 5 tabs: counter (mic+confirm), ledger, stock, list (restock/reminders/deliveries), shop (join QR, summary). |
+| `frontend/app/lib/mic.ts` | getUserMedia → AudioWorklet → Float32→PCM16 @16 kHz → binary WS frames + `commit` on stop. `hardStop()` = instant teardown; `VoiceSession.live()` counters power the mic-shutoff test (`window.__bkMicLive`). |
+| `frontend/app/app/page.tsx` | The product at `/app`: mic state machine, editable transcript+bill, ask-back cards, adaptive tab bar per business type, coach marks. |
+| `frontend/app/page.tsx` | Public landing at `/` (logged-in → `/app`). |
+| `frontend/app/start`, `signup`, `login`, `onboarding` | Guided first-run: language → role → account → 5-step shop setup (type cards decide modules/tabs/catalog). |
 | `backend/app/vendor/` | `bolta` + `noiselab` vendored verbatim from NoiseLab — the hardened parser and its measured-benchmark companion. |
 
 ## Newer modules (post-P0)
@@ -43,6 +45,9 @@ mic (AudioWorklet, PCM16 @16kHz)
 | Module | Files | Notes |
 |---|---|---|
 | Customer accounts | `db.account_*`, `/api/me/*`, `frontend/app/m` | name+PIN, name-match join links to existing khata rows; multi-shop by design |
+| Multi-shop + auth | `db.users`, `staff_invites`, `auth.py` tokens w/ `shop_id` | every private route resolves `actor → ShopDB(shop_id)`; signup→`/api/shop/setup`→bound token |
+| Bill editing | `pipeline.edit_bill`, `POST /api/bill/edit` | edited items recompute server-side → NEW proposal id; confirm still the only write path |
+| Ask-back | `AskBack` in `app/app/page.tsx`, `unresolved`/`options` parser fields | unknown item → similar-3 / quick-create / remove; ambiguous → chooser; unknown customer → one-tap add; question spoken once via Timbre |
 | Delivery billing | `subscriptions`, `delivery_skips`, `_delivery_intent` | month bill = days−skips; ambiguity asks, never guesses |
 | Weekly insights | `db.weekly_insights`, `is hafte` intent | every figure computed from DB; Timbre speaks the template |
 | Staff + leave | `staff`, `leave_requests`, `leave_events`, `require_owner` | assistant bills/stocks; undo/leave/settings owner-only server-side; dual-approval with audit |

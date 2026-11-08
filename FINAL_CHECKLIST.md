@@ -17,8 +17,12 @@
 ## T-1h: real-phone smoke (Android)
 
 - [ ] Open the URL in **Chrome** (mic permission → Allow).
+- [ ] Fresh profile check: `/` shows the landing page; log in → `/app`
+      (already-onboarded owners skip onboarding).
 - [ ] Full hero pass: hero phrase → card → read-back → Khata → customer
       phone opens `/c/[token]` → Confirm → owner sees confirmed.
+- [ ] Mic check: after the bill sheet appears, the tab recording dot is
+      OFF; while any sheet is open the mic button is greyed.
 - [ ] Dispute path on a second entry.
 - [ ] UPI button shows QR + `upi://` link (paying is optional).
 - [ ] "dudh ka bill", "aaj ka hisaab", "Ramesh ko yaad dilao" all answer.

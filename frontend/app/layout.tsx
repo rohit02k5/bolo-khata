@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans, Noto_Sans_Devanagari, Noto_Sans_Telugu } from "next/font/google";
+import { Noto_Sans, Noto_Sans_Devanagari, Noto_Sans_Telugu, Baloo_2,
+         Hind_Guntur } from "next/font/google";
 import "./globals.css";
 
 const sans = Noto_Sans({
@@ -10,6 +11,16 @@ const deva = Noto_Sans_Devanagari({
 });
 const telu = Noto_Sans_Telugu({
   subsets: ["telugu"], variable: "--font-te", display: "swap",
+});
+/* display faces — warm rounded headings; Baloo 2 covers Latin +
+   Devanagari, Hind Guntur covers Telugu */
+const display = Baloo_2({
+  subsets: ["latin", "devanagari"], variable: "--font-display",
+  display: "swap",
+});
+const guntur = Hind_Guntur({
+  subsets: ["telugu"], weight: ["400", "600", "700"],
+  variable: "--font-display-te", display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -35,7 +46,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${sans.variable} ${deva.variable} ${telu.variable}`}>
+      <body className={`${sans.variable} ${deva.variable} ${telu.variable} ${display.variable} ${guntur.variable}`}>
         <script
           dangerouslySetInnerHTML={{
             __html: `try{var t=localStorage.getItem("bk_theme");if(t)document.documentElement.dataset.theme=t;else if(matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.dataset.theme="dark";}catch(e){}`,

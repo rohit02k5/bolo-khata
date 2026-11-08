@@ -49,3 +49,23 @@ curl https://<backend>/api/login -d ...   # login works
 SQLite lives on the instance's ephemeral disk → each redeploy reseeds
 the demo shop. That is intentional for the demo (predictable state),
 document it as a limitation in README.
+
+## product-v1 notes
+
+- **Routes**: public `/` is now the landing page; the product lives at
+  `/app` (owner/staff), `/m` (customer). Redirects handle stale sessions
+  → `/login`. Nothing to configure — all routes are static-app routes.
+- **`NEXT_PUBLIC_SAY_HOOK`**: the `?say=` scripted-test hook compiles in
+  ONLY when this env var is `1` at build time. For the film and public
+  deploys, build WITHOUT it — the param becomes a no-op. It is enabled
+  locally in `frontend/.env.production.local` (gitignored) for the
+  automated proof recordings only.
+- **Forgot password (documented manual reset)**: delete the user row
+  (`DELETE FROM users WHERE email=?`) and re-signup, or update
+  `password_hash` with `ShopDB._pw_hash(new_pw, salt)` — for the demo,
+  re-signup on the same email is the supported path.
+- **New env surface**: `SESSION_SECRET` still signs all tokens; no new
+  required vars. `DB_PATH` is a single SQLite file holding all shops —
+  back it up as before.
+- **Multi-shop**: every token is shop-bound; public links
+  (`/c`, `/r`, `/join`) are unguessable-UUID scoped — no change to deploy.

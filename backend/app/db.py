@@ -157,6 +157,16 @@ CREATE TABLE IF NOT EXISTS audit_log (
     txn_id INTEGER,
     payload TEXT DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT DEFAULT '',
+    pass_hash TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'owner',
+    shop_id INTEGER,
+    created REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS api_call_log (
     id INTEGER PRIMARY KEY,
     ts REAL NOT NULL,
@@ -171,7 +181,9 @@ SHOP_ID = 1
 
 
 class ShopDB:
-    def __init__(self, path: str | Path):
+    def __init__(self, path: str | Path,
+                 shop_id: int = SHOP_ID):
+        self.shop_id = shop_id
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(str(self.path), check_same_thread=False)
@@ -190,6 +202,20 @@ class ShopDB:
                  self.conn.execute("PRAGMA table_info(reminders)")}
         if "token" not in rcols:
             self.conn.execute("ALTER TABLE reminders ADD COLUMN token TEXT")
+        scols = {r[1] for r in
+                 self.conn.execute("PRAGMA table_info(staff)")}
+        if "invite_code" not in scols:
+            self.conn.execute(
+                "ALTER TABLE staff ADD COLUMN invite_code TEXT")
+        ccols = {r[1] for r in
+                 self.conn.execute("PRAGMA table_info(customer_accounts)")}
+        if "contact" not in ccols:
+            self.conn.execute(
+                "ALTER TABLE customer_accounts "
+                "ADD COLUMN contact TEXT DEFAULT ''")
+        if self.shop_id != SHOP_ID:
+            self.conn.commit()
+            return
         if not self.conn.execute("SELECT id FROM shops WHERE id=?",
                                  (SHOP_ID,)).fetchone():
             self.conn.execute(
@@ -208,14 +234,144 @@ class ShopDB:
     def close(self) -> None:
         self.conn.close()
 
+    def for_shop(self, shop_id: int) -> "ShopDB":
+        """Bind a new connection to another shop in the same file."""
+        return ShopDB(self.path, shop_id)
+
+    def create_shop(self, name: str, business_type: str,
+                    vpa: str = "") -> int:
+        """Create a shop row + join code; returns the new shop id."""
+        cur = self.conn.execute(
+            "INSERT INTO shops (name,business_type,vpa,join_code,"
+            "created_at) VALUES (?,?,?,?,?)",
+            (name.strip()[:80], business_type, vpa.strip()[:60],
+             uuid.uuid4().hex[:12], time.time()))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def shop_by_id(self, shop_id: int) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM shops WHERE id=?", (shop_id,)).fetchone()
+
+    # ---------------------------------------------------------- users
+    @staticmethod
+    def _pw_hash(password: str, salt: str) -> str:
+        import hashlib
+        return hashlib.scrypt(password.encode(), salt=salt.encode(),
+                              n=16384, r=8, p=1).hex()
+
+    def create_user(self, email: str, password: str,
+                    name: str = "", role: str = "owner") -> int:
+        salt = secrets.token_hex(16)
+        cur = self.conn.execute(
+            "INSERT INTO users (email,name,pass_hash,salt,role,created) "
+            "VALUES (?,?,?,?,?,?)",
+            (email.strip().lower()[:120], name.strip()[:60],
+             self._pw_hash(password, salt), salt, role, time.time()))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def user_by_email(self, email: str) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM users WHERE email=?",
+            (email.strip().lower(),)).fetchone()
+
+    def user_by_id(self, user_id: int) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+
+    def check_user_password(self, row: sqlite3.Row,
+                            password: str) -> bool:
+        return secrets.compare_digest(
+            self._pw_hash(password, row["salt"]), row["pass_hash"])
+
+    def set_user_shop(self, user_id: int, shop_id: int) -> None:
+        self.conn.execute("UPDATE users SET shop_id=? WHERE id=?",
+                          (shop_id, user_id))
+        self.conn.commit()
+
+    # -------------------------------------------------- staff invites
+    def create_staff_invite(self, name: str) -> str:
+        """Owner pre-creates an assistant; returns a one-time invite
+        code they redeem with a chosen PIN."""
+        code = secrets.token_hex(4)
+        self.conn.execute(
+            "INSERT INTO staff (shop_id,name,pin_hash,role,invite_code)"
+            " VALUES (?,?,?,?,?)",
+            (self.shop_id, name.strip()[:60], "", "assistant", code))
+        self.conn.commit()
+        return code
+
+    def staff_by_invite(self, code: str) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM staff WHERE invite_code=? AND active=1",
+            (code.strip(),)).fetchone()
+
+    def staff_set_pin(self, staff_id: int, pin: str) -> None:
+        row = self.conn.execute("SELECT name FROM staff WHERE id=?",
+                                (staff_id,)).fetchone()
+        self.conn.execute(
+            "UPDATE staff SET pin_hash=?, invite_code=NULL WHERE id=?",
+            (self._pin_hash(row["name"], pin), staff_id))
+        self.conn.commit()
+
+    def staff_shop(self, staff_id: int) -> int:
+        r = self.conn.execute("SELECT shop_id FROM staff WHERE id=?",
+                              (staff_id,)).fetchone()
+        return r["shop_id"] if r else self.shop_id
+
+    # ------------------------------------------- customer signup
+    def account_signup(self, name: str, pin: str,
+                       contact: str = "") -> int | None:
+        """Signup: create a customer account; returns None if the name
+        is already taken (use account_login for that case)."""
+        row = self.conn.execute(
+            "SELECT id FROM customer_accounts WHERE name=?",
+            (name.strip(),)).fetchone()
+        if row is not None:
+            return None
+        h = self._pin_hash(name, pin)
+        cur = self.conn.execute(
+            "INSERT INTO customer_accounts (name,pin_hash,contact,created)"
+            " VALUES (?,?,?,?)",
+            (name.strip()[:60], h, contact.strip()[:120], time.time()))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def customer_by_name(self, name: str) -> sqlite3.Row | None:
+        return self.conn.execute(
+            "SELECT * FROM customers WHERE shop_id=? AND lower(name)="
+            "lower(?)", (self.shop_id, name.strip())).fetchone()
+
+    def update_product(self, product_id: int, *, name_en: str | None = None,
+                       price_paise: int | None = None,
+                       stock: float | None = None,
+                       unit: str | None = None) -> bool:
+        row = self.conn.execute(
+            "SELECT id FROM products WHERE id=? AND shop_id=?",
+            (product_id, self.shop_id)).fetchone()
+        if row is None:
+            return False
+        sets, args = [], []
+        for k, v in (("name_en", name_en), ("price_paise", price_paise),
+                     ("stock", stock), ("unit", unit)):
+            if v is not None:
+                sets.append(f"{k}=?"); args.append(v)
+        if sets:
+            self.conn.execute(
+                f"UPDATE products SET {','.join(sets)} WHERE id=?",
+                (*args, product_id))
+            self.conn.commit()
+        return True
+
     # ---------------------------------------------------- bolta-compatible
     def products(self) -> list[sqlite3.Row]:
         return self.conn.execute(
-            "SELECT * FROM products WHERE shop_id=?", (SHOP_ID,)).fetchall()
+            "SELECT * FROM products WHERE shop_id=?", (self.shop_id,)).fetchall()
 
     def customers(self) -> list[sqlite3.Row]:
         return self.conn.execute(
-            "SELECT * FROM customers WHERE shop_id=?", (SHOP_ID,)).fetchall()
+            "SELECT * FROM customers WHERE shop_id=?", (self.shop_id,)).fetchall()
 
     def stock(self, product_id: int) -> float:
         row = self.conn.execute(
@@ -239,7 +395,7 @@ class ShopDB:
             "INSERT INTO products (shop_id,name_en,name_hi,name_te,aliases,"
             "unit,pack_size,price_paise,stock,reorder_point) "
             "VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (SHOP_ID, name_en, name_hi, name_te, aliases, unit, pack_size,
+            (self.shop_id, name_en, name_hi, name_te, aliases, unit, pack_size,
              price_paise, stock, reorder_point))
         self.conn.commit()
         return cur.lastrowid
@@ -249,7 +405,7 @@ class ShopDB:
         cur = self.conn.execute(
             "INSERT INTO customers (shop_id,name,aliases,phone,lang_pref) "
             "VALUES (?,?,?,?,?)",
-            (SHOP_ID, name, aliases, phone, lang_pref))
+            (self.shop_id, name, aliases, phone, lang_pref))
         self.conn.commit()
         return cur.lastrowid
 
@@ -300,7 +456,7 @@ class ShopDB:
             "confirm_token,idempotency_key,audio_hash,transcript,"
             "stt_confidence,reverses_id) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (SHOP_ID, time.time(), kind, customer_id, product_id, qty,
+            (self.shop_id, time.time(), kind, customer_id, product_id, qty,
              unit, amount_paise, note,
              source, payment_method, confirm_state, confirm_token,
              idempotency_key, audio_hash, transcript, stt_confidence,
@@ -414,7 +570,7 @@ class ShopDB:
         cur = self.conn.execute(
             "INSERT INTO reminders (shop_id,kind,payload,due_at,"
             "audio_path,token,customer_id) VALUES (?,?,?,?,?,?,?)",
-            (SHOP_ID, kind,
+            (self.shop_id, kind,
              json.dumps(payload, ensure_ascii=False), due_at,
              audio_path, uuid.uuid4().hex, customer_id))
         self.conn.commit()
@@ -425,7 +581,7 @@ class ShopDB:
             "SELECT r.*, c.name AS customer_name FROM reminders r "
             "LEFT JOIN customers c ON c.id=r.customer_id "
             "WHERE r.shop_id=? AND r.done=? ORDER BY r.id DESC",
-            (SHOP_ID, int(done))).fetchall()
+            (self.shop_id, int(done))).fetchall()
 
     def reminder_by_token(self, token: str) -> sqlite3.Row | None:
         return self.conn.execute(
@@ -442,13 +598,13 @@ class ShopDB:
     def complete_reminder(self, reminder_id: int) -> bool:
         cur = self.conn.execute(
             "UPDATE reminders SET done=1 WHERE id=? AND shop_id=?",
-            (reminder_id, SHOP_ID))
+            (reminder_id, self.shop_id))
         self.conn.commit()
         return cur.rowcount > 0
 
     def shop_row(self) -> sqlite3.Row:
         return self.conn.execute(
-            "SELECT * FROM shops WHERE id=?", (SHOP_ID,)).fetchone()
+            "SELECT * FROM shops WHERE id=?", (self.shop_id,)).fetchone()
 
     def shop_by_join_code(self, code: str) -> sqlite3.Row | None:
         return self.conn.execute(
@@ -469,7 +625,7 @@ class ShopDB:
             "UPDATE shops SET business_type=?, config_json=? WHERE id=?",
             (business_type,
              json.dumps({"modules": modules, "labels": labels},
-                        ensure_ascii=False), SHOP_ID))
+                        ensure_ascii=False), self.shop_id))
         self.conn.commit()
 
     def trust_scores(self) -> dict[int, dict]:
@@ -502,19 +658,19 @@ class ShopDB:
     def staff(self) -> list[sqlite3.Row]:
         return self.conn.execute(
             "SELECT * FROM staff WHERE shop_id=? AND active=1",
-            (SHOP_ID,)).fetchall()
+            (self.shop_id,)).fetchall()
 
     def add_staff(self, name: str, pin: str, role: str = "assistant"):
         self.conn.execute(
             "INSERT OR IGNORE INTO staff (shop_id,name,pin_hash,role) "
             "VALUES (?,?,?,?)",
-            (SHOP_ID, name, self._pin_hash(name, pin), role))
+            (self.shop_id, name, self._pin_hash(name, pin), role))
         self.conn.commit()
 
     def staff_login(self, name: str, pin: str) -> int | None:
         row = self.conn.execute(
             "SELECT id,pin_hash FROM staff WHERE shop_id=? AND name=? "
-            "AND active=1", (SHOP_ID, name.strip())).fetchone()
+            "AND active=1", (self.shop_id, name.strip())).fetchone()
         if row and secrets.compare_digest(
                 self._pin_hash(name, pin), row["pin_hash"]):
             return row["id"]
@@ -531,7 +687,7 @@ class ShopDB:
         cur = self.conn.execute(
             "INSERT INTO leave_requests (shop_id,staff_id,day,marked_by,"
             "created) VALUES (?,?,?,?,?)",
-            (SHOP_ID, staff_id, day, marked_by, time.time()))
+            (self.shop_id, staff_id, day, marked_by, time.time()))
         self._leave_event(cur.lastrowid, marked_by, "marked")
         self.conn.commit()
         return cur.lastrowid
@@ -560,7 +716,7 @@ class ShopDB:
         return self.conn.execute(
             "SELECT l.*, s.name AS staff_name FROM leave_requests l "
             "JOIN staff s ON s.id=l.staff_id WHERE l.shop_id=? "
-            "ORDER BY l.created DESC", (SHOP_ID,)).fetchall()
+            "ORDER BY l.created DESC", (self.shop_id,)).fetchall()
 
     def leave_events(self, leave_id: int) -> list[sqlite3.Row]:
         return self.conn.execute(
@@ -595,7 +751,7 @@ class ShopDB:
         self.conn.execute(
             "INSERT OR IGNORE INTO customer_links "
             "(account_id,shop_id,customer_id) VALUES (?,?,?)",
-            (account_id, SHOP_ID, customer_id))
+            (account_id, self.shop_id, customer_id))
         self.conn.commit()
 
     def account_links(self, account_id: int) -> list[sqlite3.Row]:
@@ -693,7 +849,7 @@ class ShopDB:
              "JOIN products p ON p.id=s.product_id WHERE s.shop_id=?")
         if active_only:
             q += " AND s.active=1"
-        return self.conn.execute(q, (SHOP_ID,)).fetchall()
+        return self.conn.execute(q, (self.shop_id,)).fetchall()
 
     def add_subscription(self, customer_id: int, product_id: int,
                          qty_per_day: float, unit: str,
@@ -701,7 +857,7 @@ class ShopDB:
         cur = self.conn.execute(
             "INSERT INTO subscriptions (shop_id,customer_id,product_id,"
             "qty_per_day,unit,price_paise) VALUES (?,?,?,?,?,?)",
-            (SHOP_ID, customer_id, product_id, qty_per_day, unit,
+            (self.shop_id, customer_id, product_id, qty_per_day, unit,
              price_paise))
         self.conn.commit()
         return cur.lastrowid
@@ -712,7 +868,7 @@ class ShopDB:
             cur = self.conn.execute(
                 "INSERT OR IGNORE INTO delivery_skips "
                 "(shop_id,subscription_id,day) VALUES (?,?,?)",
-                (SHOP_ID, subscription_id, d))
+                (self.shop_id, subscription_id, d))
             n += cur.rowcount
         self.conn.commit()
         return n
@@ -760,7 +916,7 @@ class ShopDB:
             "SELECT t.*, c.name AS customer_name FROM transactions t "
             "LEFT JOIN customers c ON c.id=t.customer_id "
             "WHERE t.shop_id=? AND t.status='ok' "
-            "ORDER BY t.ts DESC LIMIT ?", (SHOP_ID, limit)).fetchall()
+            "ORDER BY t.ts DESC LIMIT ?", (self.shop_id, limit)).fetchall()
 
     def txn_items(self, txn_id: int) -> list[sqlite3.Row]:
         return self.conn.execute(
@@ -794,7 +950,7 @@ class ShopDB:
             "SELECT kind, COALESCE(SUM(amount_paise),0) AS amt, COUNT(*) AS n "
             "FROM transactions WHERE shop_id=? AND status='ok' "
             "AND ts BETWEEN ? AND ? GROUP BY kind",
-            (SHOP_ID, lo, hi)).fetchall()
+            (self.shop_id, lo, hi)).fetchall()
         return {r["kind"]: {"amount_paise": r["amt"], "count": r["n"]}
                 for r in rows}
 
@@ -808,7 +964,7 @@ class ShopDB:
             "WHERE t.shop_id=? AND t.status='ok' AND t.ts>=? "
             "AND t.kind IN ('sale','credit_sale') "
             "GROUP BY ti.name ORDER BY rev DESC LIMIT 3",
-            (SHOP_ID, lo)).fetchall()
+            (self.shop_id, lo)).fetchall()
         # days-of-stock-left from trailing 14d velocity
         lo14 = time.time() - 14 * 86400
         vel = self.conn.execute(
@@ -816,7 +972,7 @@ class ShopDB:
             "JOIN transactions t ON t.id=ti.txn_id "
             "WHERE t.shop_id=? AND t.status='ok' AND t.ts>=? "
             "AND t.kind IN ('sale','credit_sale') GROUP BY ti.product_id",
-            (SHOP_ID, lo14)).fetchall()
+            (self.shop_id, lo14)).fetchall()
         running_out = []
         for v in vel:
             p = self.conn.execute(
@@ -836,7 +992,7 @@ class ShopDB:
             "FROM transactions t JOIN customers c ON c.id=t.customer_id "
             "WHERE t.shop_id=? AND t.status='ok' GROUP BY c.id "
             "HAVING bal>0 ORDER BY bal DESC LIMIT 3",
-            (SHOP_ID,)).fetchall()
+            (self.shop_id,)).fetchall()
         return {"days": days,
                 "top_sellers": [dict(r) for r in top],
                 "running_out": running_out[:3],
@@ -863,7 +1019,7 @@ class ShopDB:
             "SELECT t.*, c.name AS customer_name FROM transactions t "
             "LEFT JOIN customers c ON c.id=t.customer_id "
             "WHERE t.confirm_state='pending' AND t.shop_id=? "
-            "ORDER BY t.ts DESC", (SHOP_ID,)).fetchall()
+            "ORDER BY t.ts DESC", (self.shop_id,)).fetchall()
 
     # ---------------------------------------------------------------- undo
     def _audit(self, action: str, txn_id: int | None,
@@ -871,7 +1027,7 @@ class ShopDB:
         self.conn.execute(
             "INSERT INTO audit_log (shop_id,ts,actor,action,txn_id,payload) "
             "VALUES (?,?,?,?,?,?)",
-            (SHOP_ID, time.time(), actor, action, txn_id,
+            (self.shop_id, time.time(), actor, action, txn_id,
              json.dumps(payload, ensure_ascii=False)))
         self.conn.commit()
 
@@ -880,7 +1036,7 @@ class ShopDB:
         cur = self.conn.execute(
             "INSERT INTO audit_log (shop_id,ts,actor,action,txn_id,payload) "
             "VALUES (?,?,?,?,?,?)",
-            (SHOP_ID, time.time(), "owner", "propose", -1,
+            (self.shop_id, time.time(), "owner", "propose", -1,
              json.dumps(payload, ensure_ascii=False)))
         self.conn.commit()
         return cur.lastrowid
@@ -895,7 +1051,7 @@ class ShopDB:
         """Reverse the most recent ok txn: mark undone, restore stock."""
         row = self.conn.execute(
             "SELECT * FROM transactions WHERE status='ok' AND shop_id=? "
-            "ORDER BY ts DESC LIMIT 1", (SHOP_ID,)).fetchone()
+            "ORDER BY ts DESC LIMIT 1", (self.shop_id,)).fetchone()
         if row is None:
             return None
         self.conn.execute(

@@ -77,3 +77,22 @@ Customer names: రమేష్, రాహుల్, సునీత, లక్�
 - డార్క్ మోడ్ / లైట్ మోడ్ = theme menu items
 - ఇలా చెప్పండి = "Try saying" · ఈరోజు = "Aaj/Today" · వివరాలు = Details
 - రద్దు = undo · రిఫ్రెష్ = refresh
+
+## product-v1 additions (pending ear review)
+
+Ask-back (spoken + shown):
+- జాబితాలో లేదు — ఏం చేయాలి? = "list me nahi mila — kya karein?"
+- ఏది? = "Kaun sa?" · కొత్త వస్తువు చేయండి = "Naya item banayein"
+- కొత్త కస్టమర్ — చేర్చాలా? = "naya customer — jodein?" · చేర్చండి = "Jodo"
+- తీసేయండి = "Hata do" · ఎంత? = "Kitna?" · చేయండి = "Banao" (create)
+- ధర ₹ = "daam ₹" · వస్తువు = item
+- స్క్రిప్టెడ్ టెస్ట్ = "scripted test" (say-hook label)
+- మళ్లీ అర్థం చేయి = "Dobara samjho" (re-parse) · సవరించింది = "edited"
+
+Onboarding / signup / start:
+- మీ భాష ఎంచుకోండి = "Apni bhasha chunein"
+- దుకాణదారు / సర్వీస్ ప్రొవైడర్ = "Dukaan wala"
+- కస్టమర్ = customer · మీ దుకాణం అకౌంట్ = "Apni dukaan ka account"
+- పాస్‌వర్డ్ (8+, ఒక నంబర్) = password rule · చూపు/దాచు = show/hide
+- దుకాణం కోడ్ (QR కింద ఉంటుంది) = "dukaan code"
+- కొనసాగండి = "Aage badho" · వెనక్కి = "wapas"

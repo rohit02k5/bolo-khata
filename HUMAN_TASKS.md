@@ -37,7 +37,9 @@ cron-job.org) pinging every 5 min.
 ## 2. Android phone test — mobile data, not Wi-Fi [before filming]
 
 1. Chrome → open the deployed URL (or the ngrok interim URL).
-2. Allow mic permission. Login as owner.
+2. Allow mic permission. Landing `/` → Dukaan wala → **login** with the
+   demo owner account (pre-onboarded, goes straight to `/app`). For a
+   filmed fresh-signup use a NEW email — the 5-step onboarding will run.
 3. Hero Hinglish: `2 kilo cheeni, 1 Maggi, 500 gram dal, Ramesh ke naam`
    → card → read-back → tap Khata.
 4. Second phone → open the `/c/[token]` link → tap Confirm → owner sees
@@ -50,6 +52,10 @@ cron-job.org) pinging every 5 min.
    stock).
 8. UPI button → QR + `upi://` link shows. Join QR on Shop tab → second
    phone scans → joins with PIN → `/m` shows balance.
+9. product-v1 spot checks: unknown item ("1 boroline cream") → ask-back
+   card appears + is spoken → quick-create it; tap a bill line → stepper
+   edits qty; edit the transcript text → "Dobara samjho" re-parses;
+   while the bill sheet is open, the browser recording dot is OFF.
 
 ## 3. Rohit Telugu listening review [before filming]
 
