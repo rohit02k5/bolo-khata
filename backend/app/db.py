@@ -472,6 +472,32 @@ class ShopDB:
                         ensure_ascii=False), SHOP_ID))
         self.conn.commit()
 
+    def trust_scores(self) -> dict[int, dict]:
+        """Simple customer trust: 60% share of entries confirmed +
+        40% payments-vs-credit coverage, from khata history only."""
+        rows = self.conn.execute(
+            "SELECT customer_id, "
+            "SUM(confirm_state='confirmed') AS c_ok, "
+            "SUM(confirm_state IN ('confirmed','disputed','expired')) "
+            "  AS c_all, "
+            "SUM(CASE WHEN kind='credit_sale' THEN amount_paise "
+            "    ELSE 0 END) AS credit_amt, "
+            "SUM(CASE WHEN kind='payment' THEN amount_paise "
+            "    ELSE 0 END) AS pay_amt "
+            "FROM transactions WHERE status='ok' "
+            "AND customer_id IS NOT NULL GROUP BY customer_id"
+        ).fetchall()
+        out = {}
+        for r in rows:
+            conf = (r["c_ok"] / r["c_all"]) if r["c_all"] else 1.0
+            pay = min(1.0, r["pay_amt"] / r["credit_amt"]) \
+                if r["credit_amt"] else 1.0
+            out[r["customer_id"]] = {
+                "score": round(100 * (0.6 * conf + 0.4 * pay)),
+                "confirmed_share": round(conf, 2),
+                "pay_ratio": round(pay, 2)}
+        return out
+
     # ------------------------------------------------------------- staff
     def staff(self) -> list[sqlite3.Row]:
         return self.conn.execute(

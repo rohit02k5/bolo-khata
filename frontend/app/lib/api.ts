@@ -45,6 +45,7 @@ export function setToken(t: string) { token = t; }
 
 async function req(path: string, init?: RequestInit) {
   const r = await fetch(API + path, {
+    signal: AbortSignal.timeout(20000),
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -127,6 +128,16 @@ export const api = {
     });
     return r.blob();
   },
+  tryCommand: (transcript: string, lang: string) =>
+    req("/api/try/command", {
+      method: "POST", body: JSON.stringify({ transcript, lang }),
+    }) as Promise<Proposal>,
+  tryConfirm: (proposal_id: string, accept: boolean,
+               payment_method = "") =>
+    req("/api/try/confirm", {
+      method: "POST",
+      body: JSON.stringify({ proposal_id, accept, payment_method }),
+    }) as Promise<WriteResult>,
   reminderView: (tok: string) => req(`/api/r/${tok}`),
   confirmView: (tok: string) => req(`/api/confirm/${tok}`),
   confirmRespond: (tok: string, action: "confirm" | "dispute") =>

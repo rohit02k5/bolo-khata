@@ -12,7 +12,7 @@ import logging
 import os
 
 import app.bootstrap  # noqa: F401  (vendor path + dotenv, import first)
-from fastapi import Depends, FastAPI, HTTPException, WebSocket
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -63,9 +63,66 @@ class ConfirmReq(BaseModel):
     payment_method: str = ""
 
 
+_EMPTY_RESP = {"proposal_id": "", "kind": "action", "intent": "empty",
+               "description": "Kuch sunai nahi diya — dobara bolo",
+               "spoken": "", "confidence": 0.0, "needs_confirm": False,
+               "unresolved": [], "lang": "hinglish", "noise_hint": True}
+
+
 @app.post("/api/command")
-def command(req: CommandReq, actor: str = Depends(auth.current_actor)):
+def command(req: CommandReq, request: Request,
+            actor: str = Depends(auth.current_actor)):
+    from app.ratelimit import limiter
+    ip = request.client.host if request.client else "?"
+    if not limiter.hit(f"cmd:{ip}", 600):
+        raise HTTPException(429, "rate limit — try tomorrow")
+    if not req.transcript.strip():
+        return _EMPTY_RESP
     return pipeline.command_to_proposal(req.transcript, req.lang, db)
+
+
+# ------------------------------------------------ /try judge sandbox
+# Public, synthetic data, resets daily, per-IP daily cap — it cannot
+# burn real Gnani credits through the ledger path (parse is free; the
+# STT relay does not store audio and is used live only).
+_try_state: dict = {"db": None, "day": ""}
+
+
+def _try_db() -> ShopDB:
+    from datetime import date
+    today = date.today().isoformat()
+    if _try_state["day"] != today:
+        if _try_state["db"] is not None:
+            _try_state["db"].close()
+        import pathlib
+        p = pathlib.Path(config.DB_PATH).parent / "try.db"
+        p.unlink(missing_ok=True)
+        _try_state["db"] = ShopDB(str(p))
+        _try_state["db"].seed_if_empty(seed)
+        _try_state["day"] = today
+    return _try_state["db"]
+
+
+@app.post("/api/try/command")
+def try_command(req: CommandReq, request: Request):
+    from app.ratelimit import limiter
+    ip = request.client.host if request.client else "?"
+    if not limiter.hit(f"try:{ip}", 60):
+        raise HTTPException(429, "sandbox cap reached — resets tomorrow")
+    if not req.transcript.strip():
+        return _EMPTY_RESP
+    return pipeline.command_to_proposal(req.transcript, req.lang,
+                                        _try_db())
+
+
+@app.post("/api/try/confirm")
+def try_confirm(req: ConfirmReq, request: Request):
+    from app.ratelimit import limiter
+    ip = request.client.host if request.client else "?"
+    if not limiter.hit(f"try:{ip}", 60):
+        raise HTTPException(429, "sandbox cap reached — resets tomorrow")
+    return pipeline.confirm(req.proposal_id, req.accept, _try_db(),
+                            payment_method=req.payment_method)
 
 
 _STAFF_FORBIDDEN_INTENTS = {"undo", "leave_mark", "shop_config"}
@@ -101,7 +158,8 @@ def ledger(actor: str = Depends(auth.current_actor)):
     return {
         "recent": out,
         "balances": [{"customer_id": c["id"], "name": c["name"],
-                      "balance_paise": db.balance_paise(c["id"])}
+                      "balance_paise": db.balance_paise(c["id"]),
+                      "trust": db.trust_scores().get(c["id"])}
                      for c in db.customers()],
         "pending": [dict(r) for r in db.pending_confirmations()],
         "shop": dict(db.conn.execute(
