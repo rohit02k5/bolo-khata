@@ -30,6 +30,21 @@ Cash / UPI / Khata → stock deducts → customer gets a WhatsApp/SMS deep
 link → **Confirm / Dispute** updates the ledger state
 (`pending → confirmed|disputed`).
 
+Beyond the hero flow, the same voice surface covers:
+
+- **Stock & queries** — `"chini kitni bachi hai"`, `"20 kilo gehu aaya"`,
+  `"dahi khatam ho gaya"` (stock-out adjust), `"aaj ka hisaab"` (daily
+  summary spoken back), `"baaki"`.
+- **Restock & reminders** — `"next time 20 kilo gehu mangwana"` →
+  checklist; `"Ramesh ko yaad dilao"` → Timbre voice note + public
+  playback link with the real balance read from the DB.
+- **Daily deliveries** — `"Ramesh ka doodh kal se 2 din nahi chahiye"` →
+  skip days; `"dudh ka bill"` → month bill = days-in-month − skips
+  (milk/newspaper billing).
+- **Customer onboarding** — join QR at the counter → `/join/[code]`.
+- **Undo** — append-only reversal: `"galat, wapas"` / deny after a write.
+- **Checkout** — Cash / **UPI QR** (`upi://` deep link) / Add to Khata.
+
 ## Repo layout
 
 ```
@@ -39,12 +54,15 @@ backend/            FastAPI + vendored bolta/noiselab core
   app/db.py         SQLite ledger: paise, confirm tokens, audit, undo
   app/pipeline.py   transcript -> proposal -> confirm -> write
   app/tts.py        Timbre proxy (REST + SSE), retry on flaky edge
-  app/llm.py        optional schema-validated LLM assist (off by default)
-  tests/            205 tests, all offline
+  tests/            207 tests, all offline
   schema.sql        Postgres/RLS reference for the deploy step
 frontend/           Next.js PWA (mobile-first, dark, captions-friendly)
-  app/page.tsx      counter / khata / stock tabs, big mic button
+  app/page.tsx      counter / khata / stock / list / shop tabs, big mic
   app/c/[token]/    customer confirm page (public, token-scoped)
+  app/join/[code]/  customer self-join from a QR at the counter
+  app/r/[token]/    public voice-note reminder playback
+  app/benchmark/    measured STT results, honest provenance
+  app/about/        product + model roles
   app/lib/mic.ts    AudioWorklet -> PCM16 @16kHz -> WS
 ```
 
@@ -65,6 +83,14 @@ Single ngrok tunnel → `http://localhost:8000`; FastAPI proxies page
 traffic to the Next server, so **one HTTPS URL serves UI + API + WSS**.
 Start: `ngrok http 8000`. (Production deploy: Vercel frontend + always-on
 backend — see PLAN.md.)
+
+## Fallback (labeled)
+
+The original Streamlit prototype lives in `../NoiseLab/bolta_app.py`
+(`.venv/bin/python -m streamlit run bolta_app.py`, port 8501). It shares
+the same vendored ledger core and works fully offline — it's the
+demonstrated fallback if the web stack fails during filming. It is a
+prototype: single-owner, no web deploy, no customer-confirm links.
 
 ## Security & trust
 
