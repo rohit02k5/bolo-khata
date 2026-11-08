@@ -42,11 +42,16 @@ export default function Home() {
   const [lat, setLat] = useState<{ stt?: number; parse?: number; tts?: number }>({});
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(false);
+  const [role, setRole] = useState("owner");
+  const [staffName, setStaffName] = useState("");
+  const [staffPin, setStaffPin] = useState("");
+  const [loginMode, setLoginMode] = useState<"owner" | "staff">("owner");
   const session = useRef<VoiceSession | null>(null);
 
   useEffect(() => {
     const t = localStorage.getItem("bk_token");
-    if (t) { setTok(t); setToken(t); refresh(t); }
+    const r = localStorage.getItem("bk_role") || "owner";
+    if (t) { setTok(t); setToken(t); setRole(r); refresh(t); }
   }, []);
 
   function refresh(t = tok) {
@@ -57,8 +62,17 @@ export default function Home() {
 
   async function doLogin() {
     const r = await api.login(email, pw);
-    setToken(r.token); setTok(r.token);
+    setToken(r.token); setTok(r.token); setRole("owner");
     localStorage.setItem("bk_token", r.token);
+    localStorage.setItem("bk_role", "owner");
+    refresh(r.token);
+  }
+
+  async function doStaffLogin() {
+    const r = await api.staffLogin(staffName, staffPin);
+    setToken(r.token); setTok(r.token); setRole("staff");
+    localStorage.setItem("bk_token", r.token);
+    localStorage.setItem("bk_role", "staff");
     refresh(r.token);
   }
 
@@ -149,10 +163,23 @@ export default function Home() {
         <h1>Bolo Khata <small>voice-first kirana ledger · Gnani Prisma + Timbre</small></h1>
         <div className="card">
           <div className="list">
-            <label className="dim">Owner login</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" />
-            <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="password" />
-            <button className="primary" onClick={doLogin}>Login</button>
+            <div className="row" style={{ gap: 8 }}>
+              <button className={loginMode === "owner" ? "primary" : "ghost"}
+                onClick={() => setLoginMode("owner")}>Owner</button>
+              <button className={loginMode === "staff" ? "primary" : "ghost"}
+                onClick={() => setLoginMode("staff")}>Staff</button>
+            </div>
+            {loginMode === "owner" ? (<>
+              <label className="dim">Owner login</label>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" />
+              <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="password" />
+              <button className="primary" onClick={doLogin}>Login</button>
+            </>) : (<>
+              <label className="dim">Staff login (naam + PIN)</label>
+              <input value={staffName} onChange={(e) => setStaffName(e.target.value)} placeholder="naam" />
+              <input value={staffPin} onChange={(e) => setStaffPin(e.target.value)} placeholder="4-digit PIN" inputMode="numeric" maxLength={4} />
+              <button className="primary" onClick={doStaffLogin}>Login</button>
+            </>)}
           </div>
         </div>
       </main>
@@ -172,7 +199,9 @@ export default function Home() {
       </header>
 
       <div className="tabs">
-        {(["counter", "ledger", "stock", "list", "shop"] as const).map((t) => (
+        {(["counter", "ledger", "stock", "list", "shop"] as const)
+          .filter((t) => role === "owner" || t !== "shop")
+          .map((t) => (
           <button key={t} className={tab === t ? "sel" : ""} onClick={() => setTab(t)}>
             {t === "counter" ? "🎙️" : t === "ledger" ? "📒" :
              t === "stock" ? "📦" : t === "list" ? "📝" : "🏪"}
@@ -184,6 +213,7 @@ export default function Home() {
       </div>
 
       {tab === "counter" && (<>
+        {role === "staff" && <StaffLeaveBanner />}
         <div className="card" style={{ textAlign: "center" }}>
           <button className={"big-mic" + (listening ? " on" : "")} onClick={toggleMic}>
             {listening ? "⏹" : "🎤"}
@@ -269,7 +299,8 @@ export default function Home() {
         )}
 
         <div className="row">
-          <button className="ghost" onClick={doUndo}>↩︎ Undo last</button>
+          {role === "owner" &&
+            <button className="ghost" onClick={doUndo}>↩︎ Undo last</button>}
           <button className="ghost" onClick={() => refresh()}>⟳ Refresh</button>
         </div>
       </>)}
@@ -320,10 +351,60 @@ export default function Home() {
 
       {tab === "stock" && ledger && <StockPanel />}
       {tab === "list" && <RemindersPanel />}
-      {tab === "shop" && <ShopPanel />}
+      {tab === "shop" && (<><ShopPanel /><LeavePanel /></>)}
 
       {toast && <div className="toast">{toast}</div>}
     </main>
+  );
+}
+
+function StaffLeaveBanner() {
+  const [items, setItems] = useState<any[]>([]);
+  const load = () => api.staffLeave()
+    .then((r) => setItems(r.leave.filter((l: any) => l.state === "pending")))
+    .catch(() => {});
+  useEffect(() => { load(); }, []);
+  if (!items.length) return null;
+  return (
+    <div className="card" style={{ borderColor: "#f59e0b" }}>
+      <div className="dim">📋 Owner ne aapki chutti mark ki — sahi hai?</div>
+      {items.map((l) => (
+        <div className="entry" key={l.id}>
+          <span>{l.day} · marked by {l.marked_by}</span>
+          <span style={{ display: "flex", gap: 6 }}>
+            <button className="primary" style={{ padding: "4px 12px" }}
+              onClick={async () => { await api.staffLeaveRespond(l.id, "accept"); load(); }}>
+              ✔</button>
+            <button className="ghost" style={{ padding: "4px 12px" }}
+              onClick={async () => { await api.staffLeaveRespond(l.id, "dispute"); load(); }}>
+              ✖</button>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LeavePanel() {
+  const [items, setItems] = useState<any[]>([]);
+  const load = () => api.leave()
+    .then((r) => setItems(r.leave)).catch(() => setItems([]));
+  useEffect(() => { load(); }, []);
+  if (!items.length) return null;
+  const COLOR: Record<string, string> =
+    { pending: "#facc15", accepted: "#4ade80", disputed: "#f87171" };
+  return (
+    <div className="card list">
+      <div className="dim">📋 Staff leave (dual approval)</div>
+      {items.map((l) => (
+        <div className="entry" key={l.id}>
+          <span>{l.staff_name} · {l.day}
+            <span className="dim"> · by {l.marked_by}</span></span>
+          <span style={{ color: COLOR[l.state], fontWeight: 700 }}>
+            {l.state}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 

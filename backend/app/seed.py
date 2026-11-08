@@ -41,6 +41,9 @@ PRODUCTS = [
     ("Akhbar", "अख़बार", "పేపర్", "akhbar,akhbaar,newspaper,paper,dainik,दैनिक,वार्ता,వార్తాపత్రిక,news", "piece", 1, 30, 10, 600, 3),
 ]
 
+# (name, PIN) — one assistant for the demo; roles come from login, not voice
+STAFF = [("Amit", "2468")]
+
 # customer name -> (product, qty/day, unit) daily-delivery subscriptions
 SUBSCRIPTIONS = [
     ("Ramesh", "Doodh", 1.0, "packet"),
@@ -85,6 +88,11 @@ def sync_catalog(db) -> None:
     db.conn.commit()
 
 
+def seed_staff(db) -> None:
+    for name, pin in STAFF:
+        db.add_staff(name, pin, role="assistant")
+
+
 def seed_subscriptions(db) -> None:
     """Idempotent delivery-subscription backfill (separate from the
     historical-data seed so existing DBs get subs too)."""
@@ -105,6 +113,7 @@ def seed(db, *, days: int = 60, rng_seed: int = 42) -> None:
     if db.products():
         sync_catalog(db)
         seed_subscriptions(db)
+        seed_staff(db)
         return
     g = np.random.default_rng(rng_seed)
     prod_ids = {}
@@ -156,3 +165,4 @@ def seed(db, *, days: int = 60, rng_seed: int = 42) -> None:
             db._txn("payment", customer_id=cid,
                     amount_paise=amt // 2, note="seed part-payment",
                     source="seed", payment_method="cash")
+    seed_staff(db)

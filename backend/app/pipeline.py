@@ -37,6 +37,17 @@ def _gc() -> None:
         _pending.pop(k, None)
 
 
+def peek_intent(proposal_id: str) -> str | None:
+    """Read a stashed proposal's intent without consuming it — used for
+    server-side role gates (staff cannot apply undo/leave writes)."""
+    entry = _pending.get(proposal_id)
+    if entry is None:
+        return None
+    if entry["kind"] == "action":
+        return getattr(entry["obj"], "intent", None)
+    return entry["kind"]
+
+
 def _stash(kind: str, obj: Any, transcript: str, lang: str) -> str:
     _gc()
     pid = uuid.uuid4().hex[:16]
@@ -254,11 +265,47 @@ def _delivery_intent(canon: str, transcript: str, lang: str,
     return None
 
 
+_LEAVE_HINTS = ("chutti", "chhutti", "nahi aaya", "nahi aayi",
+                "absent", "leave le", "leave pe", "అవకాశం", "రాలేదు")
+
+
+def _leave_intent(canon: str, transcript: str, lang: str,
+                  db) -> dict | None:
+    """'Amit kal chutti pe' -> dual-approval leave proposal."""
+    if not any(h in canon for h in _LEAVE_HINTS):
+        return None
+    hits = [s for s in db.staff() if s["name"].lower() in canon]
+    if len(hits) != 1:
+        row, *_ = _match(canon.split()[0], db.staff()) \
+            if canon.split() else (None, 0.0, [])
+        if row is None:
+            return None
+        hits = [row]
+    staff = hits[0]
+    from datetime import date, timedelta
+    off = 0 if "aaj" in canon else 2 if "parso" in canon else 1
+    day = (date.today() + timedelta(days=off)).isoformat()
+    desc = (f"{staff['name']} {day} ko absent mark karein? "
+            "Staff ko approve/dispute karna hoga.")
+    pid = _stash("leave_mark",
+                 {"staff_id": staff["id"], "staff_name": staff["name"],
+                  "day": day}, transcript, lang)
+    return {"proposal_id": pid, "kind": "action",
+            "intent": "leave_mark", "description": desc,
+            "spoken": desc + " Sahi hai?", "confidence": 0.9,
+            "needs_confirm": True, "unresolved": [], "lang": lang,
+            "noise_hint": False}
+
+
 def _reminder_or_stockout(transcript: str, lang: str,
                           db) -> dict | None:
     """Voice reminders + stock adjust — checked before bill/vendored parse."""
     canon = canonical(transcript)
     toks = set(canon.split())
+
+    lv = _leave_intent(canon, transcript, lang, db)
+    if lv is not None:
+        return lv
 
     dv = _delivery_intent(canon, transcript, lang, db)
     if dv is not None:
@@ -518,6 +565,12 @@ def confirm(proposal_id: str, accept: bool, db, *,
             out["audio_error"] = audio_err
             out["note_text"] = note
         return out
+
+    if entry["kind"] == "leave_mark":
+        p = entry["obj"]
+        lid = db.leave_mark(p["staff_id"], p["day"], marked_by="owner")
+        return {"ok": True, "written": True, "leave_id": lid,
+                "spoken": speak_text.done(lang)}
 
     if entry["kind"] == "delivery_skip":
         p = entry["obj"]

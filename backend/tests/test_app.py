@@ -197,6 +197,41 @@ def test_customer_account_pin_and_links(db):
     assert all(p["confirm_state"] == "pending" for p in pend)
 
 
+def test_staff_login_and_wrong_pin(db):
+    sid = db.staff_login("Amit", "2468")
+    assert sid is not None
+    assert db.staff_login("Amit", "0000") is None
+    assert db.staff_login("Nobody", "1234") is None
+
+
+def test_leave_dual_approval_flow(db):
+    sid = db.staff_login("Amit", "2468")
+    lid = db.leave_mark(sid, "2026-11-10", marked_by="owner")
+    assert db.leave_for_staff(sid)[0]["state"] == "pending"
+    # wrong staff can't respond to someone else's request
+    assert not db.leave_respond(lid, sid + 99, "accept")
+    assert db.leave_respond(lid, sid, "accept")
+    assert db.leave_for_staff(sid)[0]["state"] == "accepted"
+    # decided requests can't be flipped — append-only state
+    assert not db.leave_respond(lid, sid, "dispute")
+    assert [e["action"] for e in db.leave_events(lid)] == \
+        ["marked", "accept"]
+
+
+def test_voice_leave_mark_intent(db):
+    r = P.command_to_proposal("Amit kal chutti pe hai", "hinglish", db)
+    assert r["intent"] == "leave_mark" and r["needs_confirm"]
+    c = P.confirm(r["proposal_id"], True, db)
+    assert c["written"]
+    sid = db.staff_login("Amit", "2468")
+    assert db.leave_for_staff(sid)[0]["state"] == "pending"
+
+
+def test_peek_intent_for_role_gate(db):
+    r = P.command_to_proposal("galat wapas karo", "hinglish", db)
+    assert P.peek_intent(r["proposal_id"]) in ("undo", "action")
+
+
 def test_weekly_insights_intent_and_numbers(db):
     r = P.command_to_proposal("is hafte ka hisaab batao", "hinglish", db)
     assert r["intent"] == "weekly_insights" and not r["needs_confirm"]

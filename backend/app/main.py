@@ -32,9 +32,10 @@ app.add_middleware(
 db = ShopDB(config.DB_PATH)
 db.seed_if_empty(seed)
 # idempotent backfills for pre-existing DBs (new aliases, subscriptions)
-from app.seed import sync_catalog, seed_subscriptions
+from app.seed import sync_catalog, seed_subscriptions, seed_staff
 sync_catalog(db)
 seed_subscriptions(db)
+seed_staff(db)
 
 app.include_router(auth.router)
 app.include_router(tts.router)
@@ -67,14 +68,22 @@ def command(req: CommandReq, actor: str = Depends(auth.current_actor)):
     return pipeline.command_to_proposal(req.transcript, req.lang, db)
 
 
+_STAFF_FORBIDDEN_INTENTS = {"undo", "leave_mark"}
+
+
 @app.post("/api/confirm")
 def confirm(req: ConfirmReq, actor: str = Depends(auth.current_actor)):
+    intent = pipeline.peek_intent(req.proposal_id)
+    if actor.startswith("staff:") and \
+            intent in _STAFF_FORBIDDEN_INTENTS:
+        raise HTTPException(
+            403, "staff cannot apply undo/leave — owner only")
     return pipeline.confirm(req.proposal_id, req.accept, db,
                             payment_method=req.payment_method)
 
 
 @app.post("/api/undo")
-def undo(actor: str = Depends(auth.current_actor)):
+def undo(actor: str = Depends(auth.require_owner)):
     row = db.undo_last()
     return {"ok": True, "undone": dict(row) if row else None,
             "spoken": speak_text.done("hinglish") if row else
@@ -217,6 +226,50 @@ def customer_pending(aid: int = Depends(auth.current_customer)):
 @app.get("/api/me/expenses")
 def customer_expenses(aid: int = Depends(auth.current_customer)):
     return db.account_expenses(aid)
+
+
+# ------------------------------------------------------------- staff
+class StaffLoginReq(BaseModel):
+    name: str
+    pin: str
+
+
+@app.post("/api/staff/login")
+def staff_login(req: StaffLoginReq):
+    sid = db.staff_login(req.name.strip()[:40], req.pin)
+    if sid is None:
+        raise HTTPException(401, "wrong name or PIN")
+    return {"token": auth.issue_staff_token(sid), "staff_id": sid,
+            "role": "assistant"}
+
+
+@app.get("/api/staff/leave")
+def staff_leave(sid: int = Depends(auth.current_staff)):
+    return {"leave": [dict(r) for r in db.leave_for_staff(sid)]}
+
+
+class LeaveRespondReq(BaseModel):
+    action: str  # 'accept' | 'dispute'
+
+
+@app.post("/api/staff/leave/{leave_id}/respond")
+def staff_leave_respond(leave_id: int, req: LeaveRespondReq,
+                        sid: int = Depends(auth.current_staff)):
+    if req.action not in ("accept", "dispute"):
+        raise HTTPException(400, "action must be accept|dispute")
+    if not db.leave_respond(leave_id, sid, req.action):
+        raise HTTPException(404, "no pending request for you")
+    return {"ok": True}
+
+
+@app.get("/api/leave")
+def owner_leave(actor: str = Depends(auth.require_owner)):
+    out = []
+    for r in db.leave_all():
+        d = dict(r)
+        d["events"] = [dict(e) for e in db.leave_events(r["id"])]
+        out.append(d)
+    return {"leave": out}
 
 
 @app.get("/api/me/reminders")

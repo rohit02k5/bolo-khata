@@ -97,6 +97,32 @@ CREATE TABLE IF NOT EXISTS delivery_skips (
     day TEXT NOT NULL,           -- YYYY-MM-DD Asia/Kolkata
     UNIQUE(subscription_id, day)
 );
+CREATE TABLE IF NOT EXISTS staff (
+    id INTEGER PRIMARY KEY,
+    shop_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    pin_hash TEXT NOT NULL,
+    role TEXT DEFAULT 'assistant',
+    active INTEGER DEFAULT 1,
+    UNIQUE(shop_id, name)
+);
+CREATE TABLE IF NOT EXISTS leave_requests (
+    id INTEGER PRIMARY KEY,
+    shop_id INTEGER NOT NULL,
+    staff_id INTEGER NOT NULL,
+    day TEXT NOT NULL,           -- YYYY-MM-DD
+    marked_by TEXT NOT NULL,     -- 'owner'
+    state TEXT DEFAULT 'pending',-- pending|accepted|disputed
+    created REAL DEFAULT 0,
+    decided_at REAL
+);
+CREATE TABLE IF NOT EXISTS leave_events (
+    id INTEGER PRIMARY KEY,
+    leave_id INTEGER NOT NULL,
+    actor TEXT NOT NULL,
+    action TEXT NOT NULL,
+    ts REAL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS customer_accounts (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
@@ -424,6 +450,75 @@ class ShopDB:
     def shop_by_join_code(self, code: str) -> sqlite3.Row | None:
         return self.conn.execute(
             "SELECT * FROM shops WHERE join_code=?", (code,)).fetchone()
+
+    # ------------------------------------------------------------- staff
+    def staff(self) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM staff WHERE shop_id=? AND active=1",
+            (SHOP_ID,)).fetchall()
+
+    def add_staff(self, name: str, pin: str, role: str = "assistant"):
+        self.conn.execute(
+            "INSERT OR IGNORE INTO staff (shop_id,name,pin_hash,role) "
+            "VALUES (?,?,?,?)",
+            (SHOP_ID, name, self._pin_hash(name, pin), role))
+        self.conn.commit()
+
+    def staff_login(self, name: str, pin: str) -> int | None:
+        row = self.conn.execute(
+            "SELECT id,pin_hash FROM staff WHERE shop_id=? AND name=? "
+            "AND active=1", (SHOP_ID, name.strip())).fetchone()
+        if row and secrets.compare_digest(
+                self._pin_hash(name, pin), row["pin_hash"]):
+            return row["id"]
+        return None
+
+    def _leave_event(self, leave_id: int, actor: str, action: str):
+        self.conn.execute(
+            "INSERT INTO leave_events (leave_id,actor,action,ts) "
+            "VALUES (?,?,?,?)",
+            (leave_id, actor, action, time.time()))
+
+    def leave_mark(self, staff_id: int, day: str,
+                   marked_by: str = "owner") -> int:
+        cur = self.conn.execute(
+            "INSERT INTO leave_requests (shop_id,staff_id,day,marked_by,"
+            "created) VALUES (?,?,?,?,?)",
+            (SHOP_ID, staff_id, day, marked_by, time.time()))
+        self._leave_event(cur.lastrowid, marked_by, "marked")
+        self.conn.commit()
+        return cur.lastrowid
+
+    def leave_respond(self, leave_id: int, staff_id: int,
+                      action: str) -> bool:
+        """staff accept/dispute — dual approval. Returns False if not
+        pending or not their request."""
+        cur = self.conn.execute(
+            "UPDATE leave_requests SET state=?, decided_at=? "
+            "WHERE id=? AND staff_id=? AND state='pending'",
+            ("accepted" if action == "accept" else "disputed",
+             time.time(), leave_id, staff_id))
+        if cur.rowcount:
+            self._leave_event(leave_id, f"staff:{staff_id}", action)
+            self.conn.commit()
+            return True
+        return False
+
+    def leave_for_staff(self, staff_id: int) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM leave_requests WHERE staff_id=? "
+            "ORDER BY created DESC", (staff_id,)).fetchall()
+
+    def leave_all(self) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT l.*, s.name AS staff_name FROM leave_requests l "
+            "JOIN staff s ON s.id=l.staff_id WHERE l.shop_id=? "
+            "ORDER BY l.created DESC", (SHOP_ID,)).fetchall()
+
+    def leave_events(self, leave_id: int) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT * FROM leave_events WHERE leave_id=? ORDER BY ts",
+            (leave_id,)).fetchall()
 
     # ---------------------------------------------- customer accounts
     @staticmethod
