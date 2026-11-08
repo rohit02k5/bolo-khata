@@ -1,15 +1,17 @@
-// Same-origin by default: when the app is served behind the single
-// public tunnel, /api/* and /ws/* land on FastAPI directly.
+// Resolution order: explicit NEXT_PUBLIC_API_URL (prod: the API host),
+// then same-origin (ngrok single-tunnel dev), then localhost:8000.
+const ENV_API = process.env.NEXT_PUBLIC_API_URL || "";
 export const API =
-  process.env.NEXT_PUBLIC_API_URL ||
+  ENV_API ||
   (typeof window !== "undefined"
     ? (window.location.port === "3000" ? "http://localhost:8000" : "")
     : "");
-export const WS_URL =
-  (typeof window !== "undefined"
+export const WS_URL = (ENV_API
+  ? ENV_API.replace(/^http/, "ws")
+  : (typeof window !== "undefined"
     ? `${window.location.protocol === "https:" ? "wss" : "ws"}://` +
       `${window.location.port === "3000" ? "localhost:8000" : window.location.host}`
-    : "ws://localhost:8000") + "/ws/stt";
+    : "ws://localhost:8000")) + "/ws/stt";
 
 export interface Proposal {
   proposal_id: string;

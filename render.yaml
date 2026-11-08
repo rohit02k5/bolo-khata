@@ -1,0 +1,31 @@
+# Render blueprint — backend web service (always-on, no cold starts)
+# Dashboard: New > Blueprint > point at this repo. Set secret env vars
+# in the dashboard (marked sync:false below).
+services:
+  - type: web
+    name: bolo-khata-api
+    runtime: docker
+    rootDir: backend
+    plan: starter            # always-on — required for the demo
+    healthCheckPath: /healthz
+    envVars:
+      - key: GNANI_API_KEY
+        sync: false
+      - key: OWNER_EMAIL
+        value: owner@bolokhata.demo
+      - key: OWNER_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: SHOP_NAME
+        value: Sharma Kirana Store
+      - key: SHOP_VPA
+        value: bolokhata-demo@upi
+      - key: CORS_ORIGINS
+        value: http://localhost:3000   # add the Vercel domain after deploy
+      - key: FRONTEND_ORIGIN
+        value: http://localhost:3000   # set to the Vercel URL
+      - key: STT_MODEL
+        value: prisma-v3.0
+      - key: TTS_MODEL
+        value: timbre-v2.5
