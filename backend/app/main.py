@@ -237,23 +237,36 @@ def join(code: str, req: JoinReq):
     name = req.name.strip()[:60]
     if not name:
         raise HTTPException(400, "name required")
-    # match an existing khata row by name (case-insensitive) so joining
-    # links to the customer's real history; else create
-    row = db.conn.execute(
-        "SELECT id FROM customers WHERE lower(name)=lower(?) "
-        "AND shop_id=?", (name, 1)).fetchone()
-    cid = row["id"] if row else db.add_customer(
-        name, phone=req.phone.strip()[:15], lang_pref=req.lang_pref)
-    out = {"ok": True, "customer_id": cid, "shop_name": shop["name"]}
+    out = {"ok": True, "shop_name": shop["name"]}
     if req.pin.strip():
         if not req.pin.strip().isdigit() or len(req.pin.strip()) != 4:
             raise HTTPException(400, "PIN must be exactly 4 digits")
         aid = db.account_login(name, req.pin)
         if aid is None:
             raise HTTPException(401, "name taken — wrong PIN")
-        db.link_customer(aid, cid)
-        out["token"] = auth.issue_customer_token(aid)
-        out["account_id"] = aid
+        # a PIN join gets its own NEW khata row — idempotent per
+        # account+shop so re-joining doesn't duplicate
+        existing = db.conn.execute(
+            "SELECT customer_id FROM customer_links "
+            "WHERE account_id=? AND shop_id=?",
+            (aid, shop["id"])).fetchone()
+        if existing:
+            cid = existing["customer_id"]
+        else:
+            cid = db.add_customer(name, phone=req.phone.strip()[:15],
+                                  lang_pref=req.lang_pref)
+            db.link_customer(aid, cid)
+        out.update(customer_id=cid,
+                   token=auth.issue_customer_token(aid),
+                   account_id=aid)
+    else:
+        # anonymous join has no identity to dedupe on — match an existing
+        # khata row by name, else create
+        row = db.conn.execute(
+            "SELECT id FROM customers WHERE lower(name)=lower(?) "
+            "AND shop_id=?", (name, shop["id"])).fetchone()
+        out["customer_id"] = row["id"] if row else db.add_customer(
+            name, phone=req.phone.strip()[:15], lang_pref=req.lang_pref)
     return out
 
 
