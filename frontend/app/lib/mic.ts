@@ -3,13 +3,20 @@
 
 const WORKLET_SRC = `
 class PCM extends AudioWorkletProcessor {
+  constructor() { super(); this.n = 0; }
   process(inputs) {
     const ch = inputs[0] && inputs[0][0];
     if (ch && ch.length) {
       const buf = new Int16Array(ch.length);
+      let sum = 0;
       for (let i = 0; i < ch.length; i++) {
         const s = Math.max(-1, Math.min(1, ch[i]));
         buf[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        sum += s * s;
+      }
+      // real RMS level, throttled (~8 blocks ≈ every 2nd message)
+      if (++this.n % 2 === 0) {
+        this.port.postMessage({ level: Math.sqrt(sum / ch.length) });
       }
       this.port.postMessage(buf.buffer, [buf.buffer]);
     }
@@ -32,6 +39,7 @@ export class VoiceSession {
   private src: MediaStreamAudioSourceNode | null = null;
   onMessage: TranscriptHandler = () => {};
   onState: (s: string) => void = () => {};
+  onLevel: (rms: number) => void = () => {};
 
   async start(wsUrl: string) {
     this.ws = new WebSocket(wsUrl);
@@ -56,6 +64,10 @@ export class VoiceSession {
     this.src = this.ctx.createMediaStreamSource(this.stream);
     this.node = new AudioWorkletNode(this.ctx, "pcm16");
     this.node.port.onmessage = (ev) => {
+      if (ev.data && typeof ev.data === "object" && "level" in ev.data) {
+        this.onLevel(ev.data.level);
+        return;
+      }
       if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(ev.data);
     };
     this.src.connect(this.node);

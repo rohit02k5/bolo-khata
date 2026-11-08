@@ -17,65 +17,76 @@ export default function BenchmarkPage() {
     { what: "WS handshake with comma langs", val: "rejected — indic-auto required", ok: false },
     { what: "Partials over stream", val: "not emitted by server", ok: false },
   ];
+  const pct = (s: string) => parseFloat(s) || 0;
   return (
-    <main>
-      <h1>Benchmark <small>real measured numbers, failures included</small></h1>
+    <main className="no-tabbar">
+      <header className="topbar">
+        <div className="brand">
+          <h1 style={{ fontSize: 20 }}>Benchmark</h1>
+          <span className="tag">real measured numbers, failures included</span>
+        </div>
+      </header>
 
       <div className="card">
-        <b>Bolo Khata live checks — Prisma v3.0 + Timbre v2.5 (Nov 8, real API calls)</b>
-        <table style={{ marginTop: 8 }}>
-          <tbody>
-            {live.map((r, i) => (
-              <tr key={i}>
-                <td>{r.what}</td>
-                <td className="num">{r.val}</td>
-                <td>{r.ok ? "✅" : "❌"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <h2>Bolo Khata live checks — Prisma v3.0 + Timbre v2.5</h2>
+        <div className="dim" style={{ margin: "4px 0 8px" }}>
+          Nov 8, real API calls from Durg on consumer broadband</div>
+        <div className="list">
+          {live.map((r, i) => (
+            <div className="entry" key={i} style={{ alignItems: "flex-start" }}>
+              <span style={{ flex: 1 }}>{r.what}</span>
+              <span className="row" style={{ gap: 8, flexShrink: 0 }}>
+                <span className="dim num" style={{ maxWidth: 150,
+                  textAlign: "right" }}>{r.val}</span>
+                <span>{r.ok ? "✅" : "❌"}</span>
+              </span>
+            </div>))}
+        </div>
       </div>
 
       <div className="card">
-        <b>NoiseLab command benchmark — Prisma v2.5 (Oct 2026)</b>
-        <div className="dim" style={{ margin: "6px 0" }}>
-          84 commands × 6 conditions = 504 real API jobs.
+        <h2>NoiseLab command benchmark — Prisma v2.5</h2>
+        <div className="dim" style={{ margin: "6px 0 12px" }}>
+          84 commands × 6 conditions = 504 real API jobs (Oct 2026).
           Action-success = correct intent + entities end-to-end.
-          Baseline repo: github.com/harshita-sl/NoiseLab
+          Baseline: github.com/harshita-sl/NoiseLab
         </div>
-        <table>
-          <thead>
-            <tr><th>Condition</th><th className="num">Hindi</th>
-              <th className="num">Hinglish</th><th className="num">Telugu</th>
-              <th className="num">All</th></tr>
-          </thead>
-          <tbody>
-            {v25.map((r, i) => (
-              <tr key={i}><td>{r.cond}</td>
-                <td className="num">{r.hi}</td><td className="num">{r.hiEn}</td>
-                <td className="num">{r.te}</td><td className="num"><b>{r.all}</b></td></tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="dim" style={{ marginTop: 8 }}>
+        {v25.map((r) => (
+          <div key={r.cond} style={{ marginBottom: 12 }}>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <b style={{ fontSize: 15 }}>{r.cond}</b>
+              <b className="num">{r.all}</b>
+            </div>
+            <div className="stockbar" style={{ width: "100%", height: 10,
+              marginTop: 4 }}>
+              <i style={{ width: `${pct(r.all)}%`,
+                background: pct(r.all) >= 85 ? "var(--ok)" :
+                  pct(r.all) >= 70 ? "var(--warn)" : "var(--bad)" }} />
+            </div>
+            <div className="dim" style={{ fontSize: 12.5, marginTop: 2 }}>
+              हिंदी {r.hi} · Hinglish {r.hiEn} · తెలుగు {r.te}
+            </div>
+          </div>))}
+        <div className="audio-note" style={{ marginTop: 8 }}>
           Worst split: Telenglish clean 17% — Bolo Khata's parser now covers
           romanised Telugu (verified: “rendu kilo panchadara ramesh peru”
-          resolves correctly). Speech enhancement was neutral-or-negative in
-          NoiseLab's tests — confirm/re-ask UX is the reliable path.
+          resolves correctly). Speech enhancement was neutral-or-negative —
+          confirm/re-ask UX is the reliable path.
         </div>
       </div>
 
       <div className="card">
-        <b>Honesty notes</b>
-        <div className="dim" style={{ marginTop: 6 }}>
+        <h2>Honesty notes</h2>
+        <div className="dim" style={{ marginTop: 6, fontSize: 14 }}>
           · v2.5 numbers are NoiseLab's published results, re-measured there;
           v3.0 numbers are single-call spot checks, not a full matrix.<br/>
           · Synthetic TTS speech is easier than real speech — real-phone
           recordings land in TEST_RESULTS.md before submission.<br/>
-          · Latency shown is server-reported plus measured round trips from
-          Durg on consumer broadband — no cherry-picked numbers.
+          · Latency shown is server-reported plus measured round trips —
+          no cherry-picked numbers.
         </div>
       </div>
+      <div className="powered">Powered by <b>Gnani AI</b> · Prisma + Timbre</div>
     </main>
   );
 }

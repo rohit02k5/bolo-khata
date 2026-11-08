@@ -38,40 +38,58 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
   }
 
   return (
-    <main>
-      <h1>Bolo Khata <small>customer join</small></h1>
-      <div className="card list">
-        {err && <div>{err}</div>}
+    <main className="no-tabbar">
+      <header className="topbar">
+        <div className="brand">
+          <h1 style={{ fontSize: 20 }}>Bolo Khata</h1>
+          <span className="tag">customer join</span>
+        </div>
+      </header>
+      <div className="card list" style={{ padding: "24px 20px" }}>
+        {err && <div className="banner" style={{ borderColor: "var(--bad)",
+          background: "var(--bad-soft)" }}><b>Oops</b>{err}</div>}
         {done ? (
-          <div style={{ fontSize: 18 }}>
-            ✅ <b>{name}</b>, aap <b>{shop}</b> ke khata mein jud gaye.
-            Ab dukaan aapko udhaar confirm links bhej sakti hai.
+          <div style={{ textAlign: "center" }}>
+            <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"
+              style={{ margin: "0 auto" }}>
+              <circle cx="28" cy="28" r="26" fill="var(--ok-soft)" />
+              <path className="check-draw" d="M17 29l7 7 15-18" fill="none"
+                stroke="var(--ok)" strokeWidth="4.5" strokeLinecap="round"
+                strokeLinejoin="round" />
+            </svg>
+            <div style={{ fontSize: 18, fontWeight: 700, marginTop: 10 }}>
+              <b>{name}</b>, aap <b>{shop}</b> ke khata mein jud gaye.</div>
+            <div className="dim" style={{ marginTop: 6 }}>
+              Ab dukaan aapko udhaar confirm links bhej sakti hai.</div>
           </div>
         ) : shop && (
           <>
-            <div style={{ fontSize: 18 }}>
-              <b>{shop}</b> mein apna khata kholo
-            </div>
+            <div style={{ fontSize: 18, textAlign: "center" }}>
+              <b>{shop}</b> mein apna khata kholo</div>
             <input value={name} onChange={(e) => setName(e.target.value)}
-              placeholder="Aapka naam" />
+              placeholder="Aapka naam" aria-label="your name" />
             <input value={phone} onChange={(e) => setPhone(e.target.value)}
-              placeholder="Phone (optional)" inputMode="tel" />
+              placeholder="Phone (optional)" inputMode="tel"
+              aria-label="phone (optional)" />
             <input value={pin} onChange={(e) => setPin(e.target.value)}
-              placeholder="4-digit PIN — apna khata app ke liye (optional)"
-              inputMode="numeric" maxLength={4} />
-            <select value={lang} onChange={(e) => setLang(e.target.value)}>
+              placeholder="4-digit PIN — khata app ke liye (optional)"
+              inputMode="numeric" maxLength={4} aria-label="optional PIN" />
+            <select value={lang} onChange={(e) => setLang(e.target.value)}
+              aria-label="preferred language">
               <option value="hinglish">Hinglish</option>
               <option value="te">తెలుగు</option>
               <option value="en">English</option>
             </select>
-            <button className="primary" disabled={busy || !name.trim()}
-              onClick={submit}>Join</button>
-            <div className="audio-note">
+            <button className="primary big" disabled={busy || !name.trim()}
+              onClick={submit}>Join →</button>
+            <div className="audio-note" style={{ textAlign: "center" }}>
               Sirf naam + shop ka link. Koi install nahi, koi OTP nahi.
+              PIN doge to apna khata app /m pe bhi khulega.
             </div>
           </>
         )}
       </div>
+      <div className="powered">Powered by <b>Gnani AI</b> · Prisma + Timbre</div>
     </main>
   );
 }
