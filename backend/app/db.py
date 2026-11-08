@@ -522,6 +522,52 @@ class ShopDB:
         return {r["kind"]: {"amount_paise": r["amt"], "count": r["n"]}
                 for r in rows}
 
+    def weekly_insights(self, days: int = 7) -> dict:
+        """Top sellers, run-out estimates, top debtors — all from DB."""
+        lo = time.time() - days * 86400
+        top = self.conn.execute(
+            "SELECT ti.name, SUM(ti.qty) AS qty, "
+            "SUM(ti.qty*ti.unit_price_paise) AS rev FROM txn_items ti "
+            "JOIN transactions t ON t.id=ti.txn_id "
+            "WHERE t.shop_id=? AND t.status='ok' AND t.ts>=? "
+            "AND t.kind IN ('sale','credit_sale') "
+            "GROUP BY ti.name ORDER BY rev DESC LIMIT 3",
+            (SHOP_ID, lo)).fetchall()
+        # days-of-stock-left from trailing 14d velocity
+        lo14 = time.time() - 14 * 86400
+        vel = self.conn.execute(
+            "SELECT ti.product_id, SUM(ti.qty) AS sold FROM txn_items ti "
+            "JOIN transactions t ON t.id=ti.txn_id "
+            "WHERE t.shop_id=? AND t.status='ok' AND t.ts>=? "
+            "AND t.kind IN ('sale','credit_sale') GROUP BY ti.product_id",
+            (SHOP_ID, lo14)).fetchall()
+        running_out = []
+        for v in vel:
+            p = self.conn.execute(
+                "SELECT name_en,stock FROM products WHERE id=?",
+                (v["product_id"],)).fetchone()
+            per_day = v["sold"] / 14.0
+            if p and per_day > 0:
+                left = p["stock"] / per_day
+                if left < 7:
+                    running_out.append({"name": p["name_en"],
+                                        "days_left": round(left, 1)})
+        running_out.sort(key=lambda x: x["days_left"])
+        debtors = self.conn.execute(
+            "SELECT c.name, SUM(CASE WHEN t.kind='credit_sale' "
+            "THEN t.amount_paise WHEN t.kind='payment' "
+            "THEN -t.amount_paise ELSE 0 END) AS bal "
+            "FROM transactions t JOIN customers c ON c.id=t.customer_id "
+            "WHERE t.shop_id=? AND t.status='ok' GROUP BY c.id "
+            "HAVING bal>0 ORDER BY bal DESC LIMIT 3",
+            (SHOP_ID,)).fetchall()
+        return {"days": days,
+                "top_sellers": [dict(r) for r in top],
+                "running_out": running_out[:3],
+                "top_debtors": [{"name": r["name"],
+                                 "balance_paise": int(r["bal"])}
+                                for r in debtors]}
+
     # ------------------------------------------------------- confirmations
     def confirm_by_token(self, token: str) -> sqlite3.Row | None:
         return self.conn.execute(

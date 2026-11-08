@@ -81,6 +81,7 @@ export const api = {
     req(`/api/reminders/${id}/done`, { method: "POST" }),
   reorder: () => req("/api/reorder"),
   deliveries: () => req("/api/deliveries"),
+  weekly: () => req("/api/weekly"),
   shop: () => req("/api/shop") as Promise<{
     name: string; business_type: string; vpa: string; join_code: string;
   }>,

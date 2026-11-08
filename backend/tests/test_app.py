@@ -178,6 +178,19 @@ def test_delivery_skip_and_month_bill(db):
     assert b["total_paise"] == (dim - 2) * 2700
 
 
+def test_weekly_insights_intent_and_numbers(db):
+    r = P.command_to_proposal("is hafte ka hisaab batao", "hinglish", db)
+    assert r["intent"] == "weekly_insights" and not r["needs_confirm"]
+    w = r["insights"]
+    assert w["top_sellers"], "seeded sales should yield top sellers"
+    # spoken summary embeds real numbers, not invented ones
+    assert w["top_sellers"][0]["name"] in r["spoken"]
+    if w["top_debtors"]:
+        assert w["top_debtors"][0]["name"] in r["spoken"]
+    rt = P.command_to_proposal("is hafte", "te", db)
+    assert "వారం" in rt["spoken"]
+
+
 def test_delivery_skip_ambiguous_asks_which_customer(db):
     r = P.command_to_proposal("dudh kal se band karo", "hinglish", db)
     assert r["intent"] == "delivery_skip_clarify"
