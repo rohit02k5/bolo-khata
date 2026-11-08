@@ -386,6 +386,31 @@ function DeliveriesPanel() {
       ))}
       <div className="dim">bolo “Ramesh ka doodh kal se 2 din nahi chahiye”
         ya “dudh ka bill”</div>
+      <WeeklyCard />
+    </>
+  );
+}
+
+function WeeklyCard() {
+  const [w, setW] = useState<any>(null);
+  useEffect(() => { api.weekly().then(setW).catch(() => {}); }, []);
+  if (!w) return null;
+  return (
+    <>
+      <div className="dim" style={{ marginTop: 10 }}>📈 Is hafte</div>
+      <div className="entry"><span>Top bikri</span>
+        <span>{w.top_sellers.map((t: any) => t.name).join(", ") || "—"}</span></div>
+      {w.running_out.map((r: any) => (
+        <div className="entry" key={r.name}>
+          <span>⚠️ {r.name} khatam</span>
+          <span>~{r.days_left} din</span></div>
+      ))}
+      {w.top_debtors.map((d: any) => (
+        <div className="entry" key={d.name}>
+          <span>💰 {d.name} udhaar</span>
+          <span className="amt">{inr(d.balance_paise)}</span></div>
+      ))}
+      <div className="dim">bolo “is hafte ka hisaab batao”</div>
     </>
   );
 }

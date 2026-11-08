@@ -105,7 +105,9 @@ _STOCK_OUT_HINTS = ("kharab", "nikala", "nikaal", "nikal diya", "damage",
                     "stock kam", "फट गया", "खराब", "చెడిపోయిన")
 _SUMMARY_HINTS = ("aaj ka hisaab", "aaj ka hisab", "aaj ki sale",
                   "aaj kitna", "aaj ka sale", "today sale", "hisaab batao",
-                  "hisab batao", "hafte ka hisaab", "is hafte", "ఈరోజు")
+                  "hisab batao", "ఈరోజు")
+_WEEKLY_HINTS = ("is hafte", "hafte ka hisaab", "hafte mein", "weekly",
+                 "is week", "saat din", "ఈ వారం", "వారం హిసాబ్")
 _HINT_WORDS = {"next", "time", "agli", "baar", "list", "mein", "me",
                "checklist", "note", "kar", "lo", "yaad", "rakh",
                "mangwana", "hai", "order", "karna", "dilao", "dilana",
@@ -261,6 +263,54 @@ def _reminder_or_stockout(transcript: str, lang: str,
     dv = _delivery_intent(canon, transcript, lang, db)
     if dv is not None:
         return dv
+
+    if any(h in canon for h in _WEEKLY_HINTS):
+        w = db.weekly_insights()
+        sellers = ", ".join(t["name"] for t in w["top_sellers"]) \
+            or "kuch nahi"
+        stock_note = ("; ".join(f"{r['name']} bas {r['days_left']:g} "
+                                f"din" for r in w["running_out"]) or
+                      "stock theek hai")
+        debt = w["top_debtors"]
+        debt_note = (f"Sabse zyada udhaar {debt[0]['name']} ka "
+                     f"{inr_words(debt[0]['balance_paise'])}"
+                     if debt else "koi udhaar nahi")
+        if lang == "te":
+            s_te = ", ".join(t["name"] for t in w["top_sellers"]) \
+                or "ఏమీ లేదు"
+            d_te = (f"బాకీ ఎక్కువ {debt[0]['name']} — "
+                    f"{debt[0]['balance_paise'] // 100} రూపాయలు"
+                    if debt else "బాకీ లేదు")
+            r_te = ("; ".join(f"{r['name']} {r['days_left']:g} రోజుల్లో "
+                              "అయిపోతుంది" for r in w["running_out"])
+                    or "స్టాక్ బాగుంది")
+            desc = (f"Is hafte: top {sellers} · {stock_note} · "
+                    f"{debt_note}")
+            spoken = (f"ఈ వారం ఎక్కువగా {s_te} అమ్మకం. "
+                      f"{r_te}. {d_te}.")
+        elif lang == "en":
+            desc = (f"This week: top {sellers} · {stock_note} · "
+                    f"{debt_note}")
+            r_en = ("; ".join(f"{r['name']} runs out in "
+                              f"{r['days_left']:g} days"
+                              for r in w["running_out"]) or
+                    "stock looks fine")
+            d_en = (f"Highest balance: {debt[0]['name']} — "
+                    f"{debt[0]['balance_paise'] // 100} rupees"
+                    if debt else "no balances pending")
+            spoken = (f"This week, {sellers} sold the most. "
+                      f"{r_en}. {d_en}.")
+        else:
+            desc = (f"Is hafte: top {sellers} · {stock_note} · "
+                    f"{debt_note}")
+            spoken = (f"Is hafte sabse zyada {sellers} bika. "
+                      f"{stock_note}. {debt_note}.")
+        return {"proposal_id": "", "kind": "action",
+                "intent": "weekly_insights", "description": desc,
+                "spoken": spoken, "confidence": 1.0,
+                "needs_confirm": False, "unresolved": [],
+                "lang": lang, "noise_hint": False,
+                "insights": w}
 
     if any(h in canon for h in _SUMMARY_HINTS):
         s = db.daily_summary()

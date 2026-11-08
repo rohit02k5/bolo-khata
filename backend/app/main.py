@@ -246,6 +246,11 @@ def reminder_audio(token: str):
     return FileResponse(str(f), media_type="audio/wav")
 
 
+@app.get("/api/weekly")
+def weekly(actor: str = Depends(auth.current_actor)):
+    return db.weekly_insights()
+
+
 @app.get("/api/deliveries")
 def deliveries(actor: str = Depends(auth.current_actor)):
     out = []
