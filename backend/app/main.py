@@ -242,6 +242,21 @@ def reminder_audio(token: str):
     return FileResponse(str(f), media_type="audio/wav")
 
 
+@app.get("/api/deliveries")
+def deliveries(actor: str = Depends(auth.current_actor)):
+    out = []
+    for s in db.subscriptions():
+        b = db.month_bill(s["id"])
+        out.append({"id": s["id"], "customer": s["customer_name"],
+                    "product": s["product"],
+                    "qty_per_day": s["qty_per_day"], "unit": s["unit"],
+                    "days_billed": b["days_billed"],
+                    "days_skipped": b["days_skipped"],
+                    "skipped": b["skipped"],
+                    "month_total_paise": b["total_paise"]})
+    return {"subscriptions": out}
+
+
 @app.get("/api/reorder")
 def reorder(actor: str = Depends(auth.current_actor)):
     from bolta.reorder import suggestions

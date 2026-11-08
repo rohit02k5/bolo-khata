@@ -79,6 +79,23 @@ CREATE TABLE IF NOT EXISTS txn_items (
     unit TEXT,
     unit_price_paise INTEGER DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id INTEGER PRIMARY KEY,
+    shop_id INTEGER NOT NULL,
+    customer_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    qty_per_day REAL NOT NULL,
+    unit TEXT DEFAULT 'packet',
+    price_paise INTEGER DEFAULT 0,
+    active INTEGER DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS delivery_skips (
+    id INTEGER PRIMARY KEY,
+    shop_id INTEGER NOT NULL,
+    subscription_id INTEGER NOT NULL,
+    day TEXT NOT NULL,           -- YYYY-MM-DD Asia/Kolkata
+    UNIQUE(subscription_id, day)
+);
 CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY,
     shop_id INTEGER NOT NULL,
@@ -392,6 +409,74 @@ class ShopDB:
     def shop_by_join_code(self, code: str) -> sqlite3.Row | None:
         return self.conn.execute(
             "SELECT * FROM shops WHERE join_code=?", (code,)).fetchone()
+
+    # --------------------------------------------------------- delivery
+    def subscriptions(self, active_only: bool = True) -> list[sqlite3.Row]:
+        q = ("SELECT s.*, c.name AS customer_name, p.name_en AS product "
+             "FROM subscriptions s JOIN customers c ON c.id=s.customer_id "
+             "JOIN products p ON p.id=s.product_id WHERE s.shop_id=?")
+        if active_only:
+            q += " AND s.active=1"
+        return self.conn.execute(q, (SHOP_ID,)).fetchall()
+
+    def add_subscription(self, customer_id: int, product_id: int,
+                         qty_per_day: float, unit: str,
+                         price_paise: int) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO subscriptions (shop_id,customer_id,product_id,"
+            "qty_per_day,unit,price_paise) VALUES (?,?,?,?,?,?)",
+            (SHOP_ID, customer_id, product_id, qty_per_day, unit,
+             price_paise))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def add_skips(self, subscription_id: int, days: list[str]) -> int:
+        n = 0
+        for d in days:
+            cur = self.conn.execute(
+                "INSERT OR IGNORE INTO delivery_skips "
+                "(shop_id,subscription_id,day) VALUES (?,?,?)",
+                (SHOP_ID, subscription_id, d))
+            n += cur.rowcount
+        self.conn.commit()
+        return n
+
+    def skips_for(self, subscription_id: int,
+                  month: str | None = None) -> list[str]:
+        q = ("SELECT day FROM delivery_skips WHERE subscription_id=?")
+        args: tuple = (subscription_id,)
+        if month:
+            q += " AND day LIKE ?"
+            args = (subscription_id, month + "%")
+        return [r["day"] for r in
+                self.conn.execute(q, args).fetchall()]
+
+    def month_bill(self, subscription_id: int,
+                   month: str | None = None) -> dict:
+        """Delivery billing: qty/day x (days_in_month - skipped_days)."""
+        import calendar
+        from datetime import date
+        today = date.today()
+        y, m = (today.year, today.month) if not month else \
+            tuple(int(x) for x in month.split("-")[:2])
+        dim = calendar.monthrange(y, m)[1]
+        # milkman-style: bill projects the full month minus skipped days,
+        # so a future skip shows in the estimate immediately
+        sub = self.conn.execute(
+            "SELECT * FROM subscriptions WHERE id=?",
+            (subscription_id,)).fetchone()
+        if sub is None:
+            return {}
+        skipped = self.skips_for(
+            subscription_id, f"{y:04d}-{m:02d}")
+        billable = dim - len(skipped)
+        per_day = int(round(sub["qty_per_day"] * sub["price_paise"]))
+        return {"customer_name": "", "product": "",
+                "month": f"{y:04d}-{m:02d}", "days_billed": billable,
+                "days_skipped": len(skipped), "skipped": skipped,
+                "qty_per_day": sub["qty_per_day"],
+                "per_day_paise": per_day,
+                "total_paise": billable * per_day}
 
     # ------------------------------------------------------------ queries
     def recent(self, limit: int = 30) -> list[sqlite3.Row]:

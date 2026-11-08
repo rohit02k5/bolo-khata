@@ -135,11 +135,116 @@ def _cust_before(tokens: list[str], marker_idx: int):
     return ""
 
 
+_SKIP_HINTS = ("nahi chahiye", "band", "rok do", "rokna", "mat la",
+               "mat dena", "mat do", "skip", "cancel", "వద్దు", "వద్దులే")
+_MONTH_BILL_HINTS = ("mahine ka bill", "is mahine", "month ka bill",
+                     "monthly bill", "bill batao", "bill banao",
+                     "మాసం బిల్లు", "నెల బిల్లు")
+
+
+def _sub_product_names(db, sub) -> set[str]:
+    prow = db.conn.execute(
+        "SELECT * FROM products WHERE id=?",
+        (sub["product_id"],)).fetchone()
+    names = {sub["product"].lower()}
+    for a in (prow["aliases"] or "").split(","):
+        a = a.strip().lower()
+        if a:
+            names.add(a)
+    return names
+
+
+def _resolve_delivery_subs(db, canon: str) -> list:
+    """Subscriptions a transcript refers to: product word first, then
+    customer name to narrow."""
+    subs = db.subscriptions()
+    hits = [s for s in subs
+            if any(n in canon for n in _sub_product_names(db, s))]
+    cust, _ = _find_customer(canon.split())
+    cid = None
+    if cust:
+        row, *_ = _match(cust, db.customers())
+        if row is not None:
+            cid = row["id"]
+    else:
+        named = [s for s in subs
+                 if s["customer_name"].lower() in canon]
+        if len({s["customer_id"] for s in named}) == 1:
+            cid = named[0]["customer_id"]
+    if cid is not None:
+        if hits:
+            hits = [s for s in hits if s["customer_id"] == cid]
+        else:
+            hits = [s for s in subs if s["customer_id"] == cid]
+    return hits
+
+
+def _delivery_intent(canon: str, transcript: str, lang: str,
+                     db) -> dict | None:
+    if any(h in canon for h in _SKIP_HINTS):
+        subs = _resolve_delivery_subs(db, canon)
+        if not subs:
+            return None
+        if len(subs) > 1:
+            names = " ya ".join(sorted({s["customer_name"]
+                                        for s in subs}))
+            desc = (f"{subs[0]['product']} kis ka — {names}? "
+                    "Naam bata ke dobara bolo")
+            return {"proposal_id": "", "kind": "action",
+                    "intent": "delivery_skip_clarify",
+                    "description": desc, "spoken": desc,
+                    "confidence": 0.7, "needs_confirm": False,
+                    "unresolved": [], "lang": lang}
+        sub = subs[0]
+        m = _re.search(r"(\d+)\s*(?:din|दिन|రోజు|రోజుల)", canon)
+        count = int(m.group(1)) if m else 1
+        from datetime import date, timedelta
+        start_off = 0 if "aaj" in canon else \
+            2 if "parso" in canon else 1
+        start = date.today() + timedelta(days=start_off)
+        days = [(start + timedelta(days=i)).isoformat()
+                for i in range(count)]
+        desc = (f"{sub['customer_name']} ka {sub['product']} — "
+                f"{days[0]} se {count} din skip")
+        pid = _stash("delivery_skip",
+                     {"sub_id": sub["id"], "days": days}, transcript, lang)
+        return {"proposal_id": pid, "kind": "action",
+                "intent": "delivery_skip", "description": desc,
+                "spoken": f"{desc}. Sahi hai?", "confidence": 0.9,
+                "needs_confirm": True, "unresolved": [], "lang": lang}
+
+    month_hint = any(h in canon for h in _MONTH_BILL_HINTS) or (
+        "bill" in canon.split()
+        and not _re.search(r"\d", canon))
+    if month_hint:
+        subs = _resolve_delivery_subs(db, canon)
+        if not subs:
+            return None
+        parts = []
+        for sub in subs:
+            b = db.month_bill(sub["id"])
+            parts.append(
+                f"{sub['customer_name']} ka {sub['product']} — "
+                f"{b['month']}: {b['days_billed']} din delivery, "
+                f"{b['days_skipped']} skip, "
+                f"{inr_words(b['total_paise'])}")
+        desc = ". ".join(parts)
+        return {"proposal_id": "", "kind": "action",
+                "intent": "delivery_month_bill", "description": desc,
+                "spoken": desc + ".", "confidence": 1.0,
+                "needs_confirm": False, "unresolved": [], "lang": lang}
+    return None
+
+
 def _reminder_or_stockout(transcript: str, lang: str,
                           db) -> dict | None:
     """Voice reminders + stock adjust — checked before bill/vendored parse."""
     canon = canonical(transcript)
     toks = set(canon.split())
+
+    dv = _delivery_intent(canon, transcript, lang, db)
+    if dv is not None:
+        return dv
 
     if any(h in canon for h in _SUMMARY_HINTS):
         s = db.daily_summary()
@@ -342,6 +447,12 @@ def confirm(proposal_id: str, accept: bool, db, *,
             out["audio_error"] = audio_err
             out["note_text"] = note
         return out
+
+    if entry["kind"] == "delivery_skip":
+        p = entry["obj"]
+        n = db.add_skips(p["sub_id"], p["days"])
+        return {"ok": True, "written": True, "skipped": n,
+                "spoken": speak_text.done(lang)}
 
     if entry["kind"] == "stock_out":
         p = entry["obj"]

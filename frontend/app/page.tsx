@@ -357,7 +357,31 @@ function RemindersPanel() {
         </div>
       ))}
       {!others.length && <div className="dim">none</div>}
+      <DeliveriesPanel />
     </div>
+  );
+}
+
+function DeliveriesPanel() {
+  const [subs, setSubs] = useState<any[]>([]);
+  const load = () => api.deliveries()
+    .then((r) => setSubs(r.subscriptions)).catch(() => {});
+  useEffect(() => { load(); }, []);
+  if (!subs.length) return null;
+  return (
+    <>
+      <div className="dim" style={{ marginTop: 10 }}>🥛 Daily deliveries</div>
+      {subs.map((s) => (
+        <div className="entry" key={s.id}>
+          <span>{s.customer} — {s.product} {s.qty_per_day}/{s.unit}/din
+            {s.days_skipped > 0 &&
+              ` · ${s.days_skipped} skip`}</span>
+          <span className="amt">₹{(s.month_total_paise / 100).toFixed(0)}</span>
+        </div>
+      ))}
+      <div className="dim">bolo “Ramesh ka doodh kal se 2 din nahi chahiye”
+        ya “dudh ka bill”</div>
+    </>
   );
 }
 

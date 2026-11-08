@@ -38,6 +38,14 @@ PRODUCTS = [
     ("Besan", "बेसन", "శనగ పిండి", "besan,gram flour,chana flour", "kg", 1, 10, 4, 8000, 1),
     ("Masala", "मसाला", "మసాలా", "masala,spices,haldi,mirchi powder", "packet", 1, 25, 10, 5000, 3),
     ("Maggi Sauce", "सॉस", "సాస్", "sauce,tomato sauce,maggi sauce,ketchup", "bottle", 1, 10, 4, 13000, 0.5),
+    ("Akhbar", "अख़बार", "పేపర్", "akhbar,akhbaar,newspaper,paper,dainik,दैनिक,वार्ता,వార్తాపత్రిక,news", "piece", 1, 30, 10, 600, 3),
+]
+
+# customer name -> (product, qty/day, unit) daily-delivery subscriptions
+SUBSCRIPTIONS = [
+    ("Ramesh", "Doodh", 1.0, "packet"),
+    ("Lakshmi", "Doodh", 2.0, "packet"),
+    ("Suresh", "Akhbar", 1.0, "piece"),
 ]
 
 CUSTOMERS = [
@@ -56,8 +64,25 @@ CUSTOMERS = [
 ]
 
 
+def seed_subscriptions(db) -> None:
+    """Idempotent delivery-subscription backfill (separate from the
+    historical-data seed so existing DBs get subs too)."""
+    if db.subscriptions():
+        return
+    for cname, pname, qpd, unit in SUBSCRIPTIONS:
+        cust = db.conn.execute(
+            "SELECT id FROM customers WHERE name=?", (cname,)).fetchone()
+        prod = db.conn.execute(
+            "SELECT id FROM products WHERE name_en=?", (pname,)).fetchone()
+        if cust is None or prod is None:
+            continue
+        db.add_subscription(cust["id"], prod["id"], qpd, unit,
+                            db.price_paise(prod["id"]))
+
+
 def seed(db, *, days: int = 60, rng_seed: int = 42) -> None:
     if db.products():
+        seed_subscriptions(db)
         return
     g = np.random.default_rng(rng_seed)
     prod_ids = {}
@@ -67,6 +92,11 @@ def seed(db, *, days: int = 60, rng_seed: int = 42) -> None:
                              reorder_point=rp)
         prod_ids[en] = pid
     cust_ids = [db.add_customer(n, aliases=a) for n, a in CUSTOMERS]
+    name_to_cid = {n: cid for (n, _), cid in zip(CUSTOMERS, cust_ids)}
+    for cname, pname, qpd, unit in SUBSCRIPTIONS:
+        db.add_subscription(name_to_cid[cname], prod_ids[pname],
+                            qpd, unit,
+                            db.price_paise(prod_ids[pname]))
 
     now = time.time()
     for (en, _hi, _te, _al, unit, _pack, _st, _rp, price, avg) in PRODUCTS:

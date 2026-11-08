@@ -149,8 +149,37 @@ def test_keyterms_cover_catalog(db):
 
 def test_idempotent_bill_write(db):
     r = P.command_to_proposal(HERO, "hinglish", db)
+    cid = r["customer_id"]
+    before = db.balance_paise(cid)
     P.confirm(r["proposal_id"], True, db, payment_method="khata")
     # replaying the same proposal id is a no-op (already popped)
     again = P.confirm(r["proposal_id"], True, db, payment_method="khata")
     assert not again["ok"]
-    assert db.balance_paise(3) == 460400 + 17400
+    assert db.balance_paise(cid) == before + 17400
+
+
+def test_delivery_skip_and_month_bill(db):
+    import calendar
+    from datetime import date
+    r = P.command_to_proposal(
+        "Ramesh ka doodh kal se 2 din nahi chahiye", "hinglish", db)
+    assert r["intent"] == "delivery_skip" and r["needs_confirm"]
+    c = P.confirm(r["proposal_id"], True, db)
+    assert c["written"] and c["skipped"] == 2
+    # re-confirm same skip is idempotent (INSERT OR IGNORE)
+    r = P.command_to_proposal(
+        "Ramesh ka dudh ka bill", "hinglish", db)
+    assert r["intent"] == "delivery_month_bill"
+    sub = [s for s in db.subscriptions()
+           if s["customer_name"] == "Ramesh"][0]
+    b = db.month_bill(sub["id"])
+    dim = calendar.monthrange(date.today().year, date.today().month)[1]
+    assert b["days_skipped"] == 2
+    assert b["total_paise"] == (dim - 2) * 2700
+
+
+def test_delivery_skip_ambiguous_asks_which_customer(db):
+    r = P.command_to_proposal("dudh kal se band karo", "hinglish", db)
+    assert r["intent"] == "delivery_skip_clarify"
+    assert not r["needs_confirm"]
+    assert "Ramesh" in r["description"] and "Lakshmi" in r["description"]
