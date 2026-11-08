@@ -262,6 +262,39 @@ def test_biztype_voice_intent(db):
     assert db.shop_row()["business_type"] == "milk"
 
 
+def test_trust_scores(db):
+    ts = db.trust_scores()
+    assert ts, "seeded customers should have scores"
+    for cid, t in ts.items():
+        assert 0 <= t["score"] <= 100
+        assert 0 <= t["confirmed_share"] <= 1
+        assert 0 <= t["pay_ratio"] <= 1
+
+
+def test_proposal_writes_to_its_own_db(db):
+    # a proposal parsed on one db must not write to another —
+    # this is what keeps /try sandbox writes out of the real ledger
+    db2 = ShopDB(":memory:")
+    db2.seed_if_empty(seed)
+    r = P.command_to_proposal(HERO, "hinglish", db)
+    other_chini = db2.stock(
+        db2.conn.execute(
+            "SELECT id FROM products WHERE name_en='Chini'").fetchone()["id"])
+    P.confirm(r["proposal_id"], True, db2)   # confirm via 'other' db arg
+    assert db2.stock(
+        db2.conn.execute(
+            "SELECT id FROM products WHERE name_en='Chini'").fetchone()["id"]
+    ) == other_chini, "proposal must write to the db that parsed it"
+    db2.close()
+
+
+def test_rate_limiter():
+    from app.ratelimit import DailyLimiter
+    lim = DailyLimiter()
+    assert all(lim.hit("ip1", 3) for _ in range(3))
+    assert not lim.hit("ip1", 3)
+
+
 def test_weekly_insights_intent_and_numbers(db):
     r = P.command_to_proposal("is hafte ka hisaab batao", "hinglish", db)
     assert r["intent"] == "weekly_insights" and not r["needs_confirm"]

@@ -46,7 +46,17 @@ export default function Home() {
   const [staffName, setStaffName] = useState("");
   const [staffPin, setStaffPin] = useState("");
   const [loginMode, setLoginMode] = useState<"owner" | "staff">("owner");
+  const [online, setOnline] = useState(true);
   const session = useRef<VoiceSession | null>(null);
+
+  useEffect(() => {
+    const on = () => setOnline(true), off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    setOnline(navigator.onLine);
+    return () => { window.removeEventListener("online", on);
+      window.removeEventListener("offline", off); };
+  }, []);
 
   useEffect(() => {
     const t = localStorage.getItem("bk_token");
@@ -188,6 +198,9 @@ export default function Home() {
 
   return (
     <main>
+      {!online && <div className="card"
+        style={{ borderColor: "#f87171" }}>📶 Offline — reconnect ho jaayega,
+        entries sync nahi hongi</div>}
       <header className="topbar">
         <h1>Bolo Khata</h1>
         <div className="lang-tabs">
@@ -333,7 +346,11 @@ export default function Home() {
           <div className="dim" style={{ marginTop: 8 }}>Balances</div>
           {ledger.balances?.map((b: any) => (
             <div className="entry" key={b.customer_id}>
-              <span>{b.name}</span><b>{inr(b.balance_paise)}</b>
+              <span>{b.name}
+                {b.trust &&
+                  <span className="dim" title="confirmed share + payment history">
+                    {" "}· trust {b.trust.score}</span>}</span>
+              <b>{inr(b.balance_paise)}</b>
             </div>
           ))}
           <div className="dim" style={{ marginTop: 8 }}>Recent</div>

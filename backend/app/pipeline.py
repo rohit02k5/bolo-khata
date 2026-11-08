@@ -48,11 +48,12 @@ def peek_intent(proposal_id: str) -> str | None:
     return entry["kind"]
 
 
-def _stash(kind: str, obj: Any, transcript: str, lang: str) -> str:
+def _stash(kind: str, obj: Any, transcript: str, lang: str,
+           db=None) -> str:
     _gc()
     pid = uuid.uuid4().hex[:16]
     _pending[pid] = {"kind": kind, "obj": obj, "transcript": transcript,
-                     "lang": lang, "ts": time.time()}
+                     "lang": lang, "ts": time.time(), "db": db}
     return pid
 
 
@@ -225,7 +226,8 @@ def _delivery_intent(canon: str, transcript: str, lang: str,
         else:
             spoken = f"{desc}. Sahi hai?"
         pid = _stash("delivery_skip",
-                     {"sub_id": sub["id"], "days": days}, transcript, lang)
+                     {"sub_id": sub["id"], "days": days}, transcript, lang,
+                     db)
         return {"proposal_id": pid, "kind": "action",
                 "intent": "delivery_skip", "description": desc,
                 "spoken": spoken, "confidence": 0.9,
@@ -289,7 +291,7 @@ def _leave_intent(canon: str, transcript: str, lang: str,
             "Staff ko approve/dispute karna hoga.")
     pid = _stash("leave_mark",
                  {"staff_id": staff["id"], "staff_name": staff["name"],
-                  "day": day}, transcript, lang)
+                  "day": day}, transcript, lang, db)
     return {"proposal_id": pid, "kind": "action",
             "intent": "leave_mark", "description": desc,
             "spoken": desc + " Sahi hai?", "confidence": 0.9,
@@ -315,7 +317,7 @@ def _biztype_intent(canon: str, transcript: str, lang: str,
     desc = (f"Dukaan type '{btype}' set karein? Modules on: "
             + ", ".join(mods))
     pid = _stash("shop_config", {"business_type": btype},
-                 transcript, lang)
+                 transcript, lang, db)
     return {"proposal_id": pid, "kind": "action",
             "intent": "shop_config", "description": desc,
             "spoken": desc + ". Sahi hai?", "confidence": 0.9,
@@ -422,7 +424,7 @@ def _reminder_or_stockout(transcript: str, lang: str,
                    row["id"] if row else None,
                    "customer_name": row["name"] if row else cust,
                    "text": transcript}
-        pid = _stash("reminder", payload, transcript, lang)
+        pid = _stash("reminder", payload, transcript, lang, db)
         return {"proposal_id": pid, "kind": "action",
                 "intent": "send_voice_reminder", "description": desc,
                 "spoken": f"{desc}. Sahi hai?", "confidence":
@@ -447,7 +449,7 @@ def _reminder_or_stockout(transcript: str, lang: str,
             payload = {"product_id": i0.product_id, "qty": -abs(i0.qty),
                        "unit": i0.unit or "piece",
                        "product_name": i0.product_name}
-            pid = _stash("stock_out", payload, transcript, lang)
+            pid = _stash("stock_out", payload, transcript, lang, db)
             return {"proposal_id": pid, "kind": "action",
                     "intent": "stock_out", "description": desc,
                     "spoken": f"{desc}. Sahi hai?", "confidence": i0.score,
@@ -471,7 +473,7 @@ def _reminder_or_stockout(transcript: str, lang: str,
                                   "product_id": i.product_id,
                                   "qty": i.qty, "unit": i.unit}
                                  for i in items]}
-            pid = _stash("reminder", payload, transcript, lang)
+            pid = _stash("reminder", payload, transcript, lang, db)
             return {"proposal_id": pid, "kind": "action",
                     "intent": "add_to_shopping_list", "description": desc,
                     "spoken": "Restock list mein daal diya. Sahi hai?",
@@ -492,7 +494,7 @@ def command_to_proposal(transcript: str, lang: str, db) -> dict:
 
     bill = parse_bill(transcript, db)
     if bill.intent == "add_bill" and bill.items:
-        pid = _stash("bill", bill, transcript, lang)
+        pid = _stash("bill", bill, transcript, lang, db)
         return {
             "proposal_id": pid, "kind": "bill", "intent": "add_bill",
             "description": _bill_desc(bill),
@@ -514,7 +516,7 @@ def command_to_proposal(transcript: str, lang: str, db) -> dict:
         # standalone voice "nahi/galat/cancel" -> undo (confirm UI is tap)
         cmd.intent = "undo"
     prop = propose_action(cmd, db)
-    pid = _stash("action", prop, transcript, lang)
+    pid = _stash("action", prop, transcript, lang, db)
     spoken = prop.speak("hi" if lang == "hi" else "hinglish")
     if lang == "te":
         spoken = speak_text.for_action(prop, "te")
@@ -537,6 +539,7 @@ def confirm(proposal_id: str, accept: bool, db, *,
     entry = _pending.pop(proposal_id, None)
     if entry is None:
         return {"ok": False, "error": "proposal expired — bolo phir se"}
+    db = entry.get("db") or db   # writes go to the db that parsed it
     if not accept:
         return {"ok": True, "written": False,
                 "spoken": speak_text.deny(entry["lang"])}
