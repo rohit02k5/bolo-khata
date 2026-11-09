@@ -280,7 +280,10 @@ export default function Home() {
   const [summary, setSummary] = useState<any>(null);
   const [shop, setShop] = useState<any>(null);
   const [catalog, setCatalog] = useState<any>(null);
-  const [upiQr, setUpiQr] = useState<{ qr: string; link: string } | null>(null);
+  const [upiQr, setUpiQr] = useState<{ qr: string; link: string;
+    amt: number } | null>(null);
+  const [upiDone, setUpiDone] = useState<{ text: string;
+    link?: string } | null>(null);
   const [paySheet, setPaySheet] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [custSheet, setCustSheet] = useState(false);
@@ -539,15 +542,19 @@ export default function Home() {
       if (r.written) {
         const link = r.confirm_path
           ? `${window.location.origin}${r.confirm_path}` : undefined;
-        setResult({ text: r.spoken || "Done", link, method });
         if (method === "upi" && proposal.total_paise) {
+          // keep the pay sheet alive to show the QR (proposal clears
+          // below, so stash the amount inside upiQr)
           const u = await api.upi(proposal.total_paise);
           const qr = await QRCode.toDataURL(u.upi,
             { width: 240, margin: 1 });
-          setUpiQr({ qr, link: u.upi });
-        } else { setUpiQr(null); setPaySheet(false); }
+          setUpiQr({ qr, link: u.upi, amt: proposal.total_paise });
+          setUpiDone({ text: r.spoken || "Done", link });
+        } else {
+          setResult({ text: r.spoken || "Done", link, method });
+          setUpiQr(null); setPaySheet(false);
+        }
         setProposal(null); setEditItems([]);
-        if (method === "cash") setPaySheet(false);
         if (r.spoken) { setPhase("speaking");
           speak(r.spoken, lang).finally(() => setPhase("idle")); }
         buzz(25);
@@ -606,9 +613,10 @@ export default function Home() {
     try {
       const r = await api.addCustomer(name.trim(), "", lang);
       setCust({ id: r.customer.id, name: r.customer.name });
+      // NOTE: do NOT set proposal.customer_id here — dirty() compares
+      // cust vs proposal; if they match, confirm reuses the stale
+      // stash and the customer gets dropped from the write.
       if (proposal) setProposal({ ...proposal,
-        customer_id: r.customer.id,
-        customer_name: r.customer.name,
         unresolved: (proposal.unresolved || [])
           .filter((u) => u !== `customer:${name.trim()}`) });
       setCustSheet(false);
@@ -803,6 +811,20 @@ export default function Home() {
                 style={{ fontSize: 14 }}>{t.correct}</button>
             </div>
 
+            {/* editable transcript — reachable while the sheet is open */}
+            <div className="sheet-transcript">
+              <input className="transcript-edit" value={draft}
+                aria-label="transcript, editable"
+                placeholder={transcript}
+                onChange={(e) => { setDraft(e.target.value);
+                  setEdited(true); }} />
+              <button className="link" style={{ fontSize: 14,
+                flexShrink: 0 }}
+                onClick={() => { setTranscript(draft);
+                  runCommand(draft); }}>
+                {t.reparse}</button>
+            </div>
+
             {/* ask-back cards — questions before actions */}
             <AskBack proposal={proposal} editItems={editItems}
               setEditItems={setEditItems} catalog={catalog} t={t}
@@ -900,13 +922,13 @@ export default function Home() {
           onNew={(n: string) => addNewCustomer(n)} />)}
 
       {/* ------- pay method sheet ------- */}
-      {paySheet && proposal && (
+      {paySheet && (proposal || upiQr) && (
         <div className="sheet" role="dialog" aria-label="payment"
           style={{ zIndex: 62 }}>
           <div className="grab" aria-hidden="true" />
           <div className="centre-col" style={{ marginBottom: 14 }}>
-            <div className="display">{inr(
-              dirty() ? liveTotal() : proposal.total_paise)}</div>
+            <div className="display">{inr(upiQr ? upiQr.amt :
+              dirty() ? liveTotal() : proposal?.total_paise)}</div>
             <div className="caption">{cust.name || "customer"}</div>
           </div>
           {upiQr ? (
@@ -915,7 +937,9 @@ export default function Home() {
                 <img src={upiQr.qr} alt="UPI QR" width={200} /></div>
               <div className="caption">{t.selfReport}</div>
               <button className="primary big" style={{ width: "100%" }}
-                onClick={() => { setPaySheet(false); setUpiQr(null); }}>
+                onClick={() => { setPaySheet(false); setUpiQr(null);
+                  if (upiDone) { setResult({ ...upiDone, method: "upi" });
+                    setUpiDone(null); } }}>
                 {t.done}</button>
             </div>
           ) : (

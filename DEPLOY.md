@@ -1,5 +1,31 @@
 # Deploy — always-on (no cold starts during the demo)
 
+## CURRENT LIVE URL (verified 2026-11-09)
+
+**`https://departed-asparagus-catalog.ngrok-free.dev`** — single ngrok
+tunnel → local FastAPI (:8000) which proxies the Next production build.
+Full journey suite (44 Playwright checks, fresh profiles, mobile
+viewport, real recorded audio through the mic path) is **all green**
+on this URL. Lives only while the laptop + tunnel are up — restart
+with `ngrok http 8000` after sleep/shutdown.
+
+Vercel/Render are still the target deploy (steps below). Status:
+- **Vercel**: the supplied `vck_…` key is a Vercel **AI-Gateway** key —
+  project creation returns 403. Needs a full-scope token (vercel.com →
+  Settings → Tokens) or `vercel login` interactively.
+- **Render**: API key works, but repo deploys require the Render
+  GitHub integration (one OAuth click — connect
+  `rohit02k5/bolo-khata` at render.com → Account → GitHub). No Docker
+  daemon on this box and no `write:packages` scope, so a prebuilt GHCR
+  image path is also blocked.
+- Demo owner password rotated to a strong random value — stored only
+  in `backend/.env` (gitignored) and should be set as `OWNER_PASSWORD`
+  on the hosts' secret stores. Not printed anywhere.
+- `/try` and `/api/command` are rate-limited (per-IP daily cap,
+  `backend/app/ratelimit.py`) — safe to leave open for judges.
+- Security headers are live (nosniff, DENY framing, Referrer-Policy,
+  mic/camera Permissions-Policy) — verified through the tunnel.
+
 Architecture in prod is two URLs (this is fine — no proxy needed):
 
 - **Frontend** → Vercel (free, Next.js native)

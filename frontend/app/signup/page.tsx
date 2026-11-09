@@ -79,7 +79,7 @@ export default function Signup() {
     try {
       const r = await api.custSignup(name, pin, contact, code);
       setToken(r.token);
-      localStorage.setItem("bk_cust_token", r.token);
+      localStorage.setItem("bk_cust", r.token);
       router.replace("/m");
     } catch (e: any) {
       setErr(String(e?.message || "").includes("409")

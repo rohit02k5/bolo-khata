@@ -34,6 +34,17 @@ app.add_middleware(
         "CORS_ORIGINS", "http://localhost:3000").split(","),
     allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
 
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    resp.headers.setdefault("Permissions-Policy",
+                            "microphone=(self), camera=(self)")
+    return resp
+
 # ------------------------------------------------------------- db cache
 # One ShopDB per shop_id — each binds its queries to that shop.
 _dbs: dict[int, ShopDB] = {}

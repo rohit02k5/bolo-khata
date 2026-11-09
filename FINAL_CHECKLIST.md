@@ -1,5 +1,17 @@
 # Final checklist — filming day (Nov 9)
 
+## LIVE URL
+
+**`https://departed-asparagus-catalog.ngrok-free.dev`** (ngrok → local
+backend proxying the prod frontend). Verified 2026-11-09: 44/44
+deployed-URL journey checks green — owner signup+onboarding, ₹174 hero
+khata (stock 25→23, pending confirm), unknown-item ask-back, transcript
+re-parse + bill edits, cash + UPI QR, confirm/dispute links, real-audio
+mic shutoff (0 tracks / 0 sockets after final + on tab-hide), Telugu
+₹90, customer signup→join→khata, voice-note audio page, milk skip-day +
+month bill, staff 403 + leave dual-approval, undo, /about /benchmark
+/try, security headers, rate limit. Proof: `docs/proof/j*.webm|.png`.
+
 ## T-2h: wake-up & warm (no cold starts mid-take)
 
 - [ ] Confirm the deployed backend is **always-on** (Render paid / Railway

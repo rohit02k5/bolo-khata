@@ -5,17 +5,25 @@ recorded. Everything else can happen after.
 
 ## 1. Deploy accounts + env vars [before filming]
 
-**Vercel (frontend):**
-1. Go to vercel.com → Sign up/login with `rohitiitbh@gmail.com`.
-2. Import the GitHub repo `rohit02k5/bolo-khata`.
-3. Root directory: `frontend`. Framework: Next.js (auto-detected).
-4. Env var: `NEXT_PUBLIC_API_URL` = your backend URL from step 2 below
-   (e.g. `https://bolo-khata-api.onrender.com`). Deploy.
+The ngrok URL **already works** (`DEPLOY.md` has it — 44/44 deployed
+checks green). Real hosting needs two one-time human actions the agent
+could not do:
+
+**Vercel (frontend):** the provided `vck_…` key is AI-Gateway-scoped and
+cannot create projects (403). Either:
+- create a full-scope token at vercel.com → Settings → Tokens and hand
+  it over, or
+- vercel.com → login with `rohitiitbh@gmail.com` → Import repo
+  `rohit02k5/bolo-khata` → root `frontend` → env
+  `NEXT_PUBLIC_API_URL` = backend URL → Deploy. (~4 clicks)
 
 **Render (backend, always-on — free tier sleeps, use paid "Starter" ~$7):**
-1. render.com → sign up with `rohitiitbh@gmail.com` → New → Web Service
-   → connect `rohit02k5/bolo-khata` repo → it reads `render.yaml`
-   automatically.
+the API key works but repo deploys need the GitHub integration:
+- render.com → login → Account Settings → GitHub → **Connect** and pick
+  `rohit02k5/bolo-khata` (one OAuth click). Then New → Blueprint → it
+  reads `render.yaml` automatically.
+- (Alternative: enable GitHub `write:packages` on the PAT so a prebuilt
+  image can be pushed to GHCR, or run Docker locally.)
 2. Set env vars in the dashboard:
    - `GNANI_API_KEY` = (from backend/.env — do NOT paste in chat/git)
    - `OWNER_EMAIL` = `owner@bolokhata.demo`
@@ -36,7 +44,8 @@ cron-job.org) pinging every 5 min.
 
 ## 2. Android phone test — mobile data, not Wi-Fi [before filming]
 
-1. Chrome → open the deployed URL (or the ngrok interim URL).
+1. Chrome → open `https://departed-asparagus-catalog.ngrok-free.dev`
+   (tap "Visit Site" once at the ngrok interstitial).
 2. Allow mic permission. Landing `/` → Dukaan wala → **login** with the
    demo owner account (pre-onboarded, goes straight to `/app`). For a
    filmed fresh-signup use a NEW email — the 5-step onboarding will run.
