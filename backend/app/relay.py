@@ -40,14 +40,23 @@ async def stt_relay(websocket: WebSocket, keyterms: list[str]) -> None:
     if keyterms:
         headers["keyterms"] = ",".join(keyterms[:80])
 
-    try:
-        up = await websockets.connect(
-            config.STT_STREAM_URL, additional_headers=headers,
-            ping_interval=20, ping_timeout=20, open_timeout=10)
-    except Exception as e:  # noqa: BLE001 - surface to client
-        log.warning("upstream connect failed: %s", e)
+    up = None
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            up = await websockets.connect(
+                config.STT_STREAM_URL, additional_headers=headers,
+                ping_interval=20, ping_timeout=20, open_timeout=10)
+            break
+        except Exception as e:  # noqa: BLE001 - transient resets/timeouts
+            last_err = e
+            log.warning("upstream connect failed (try %d): %s",
+                        attempt + 1, e)
+            await asyncio.sleep(1.5 * (attempt + 1))
+    if up is None:
         await websocket.send_text(json.dumps(
-            {"type": "error", "message": f"STT connect failed: {e}"}))
+            {"type": "error",
+             "message": f"STT connect failed: {last_err}"}))
         await websocket.close()
         return
 
