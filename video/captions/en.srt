@@ -1,0 +1,67 @@
+1
+00:00:00,400 --> 00:00:04,200
+8 AM. Three customers at once.
+And the khata? That same torn register.
+
+2
+00:00:04,900 --> 00:00:07,200
+Now just… speak.
+
+3
+00:00:07,800 --> 00:00:12,000
+"2 kilo cheeni, 1 Maggi,
+500 gram dal, Ramesh ke naam"
+
+4
+00:00:12,000 --> 00:00:17,000
+The bill writes itself —
+real voice, real speech-to-text.
+
+5
+00:00:17,500 --> 00:00:20,400
+Rs 174. Ramesh. Done.
+
+6
+00:00:21,000 --> 00:00:26,000
+The customer gets the same bill
+on their phone — confirm or dispute.
+
+7
+00:00:28,500 --> 00:00:33,000
+New item? The app asks back —
+it doesn't guess.
+
+8
+00:00:35,500 --> 00:00:40,500
+Cash, UPI QR (self-reported),
+or khata. Stock updates too.
+
+9
+00:00:42,500 --> 00:00:47,500
+Customer scans the QR,
+their own khata opens.
+
+10
+00:00:50,000 --> 00:00:55,000
+Asking for money is awkward?
+The app reminds — politely, by voice.
+
+11
+00:00:56,000 --> 00:01:02,000
+Milk shop or kirana — deliveries,
+leave, accounts. Staff runs it, you watch.
+
+12
+00:01:04,500 --> 00:01:10,000
+Hinglish, Telugu, English.
+Like your own shop.
+
+13
+00:01:10,500 --> 00:01:16,000
+Tested in noise. Results public —
+failures too.
+
+14
+00:01:18,000 --> 00:01:25,000
+Bolo. Khata likh gaya.
+Bolo Khata — voice-first ledger for dukaans.

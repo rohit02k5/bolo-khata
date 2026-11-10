@@ -1,0 +1,5 @@
+# raw recordings + render intermediates stay local (regenerate via
+# footage.js -> render.js -> compose.py); only final cuts are committed
+footage/
+out/**
+!out/brand-*.mp4

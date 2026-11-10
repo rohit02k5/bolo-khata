@@ -1,0 +1,577 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  /* ---------- Bolo Khata brand-film motion engine ----------
+     Paper/ink/teal desi look. Transform+opacity motion only. */
+  @font-face { font-family: baloo; src: local("Baloo 2"); }
+  :root {
+    --paper:#f4ece0; --paper2:#efe4d2; --ink:#1c1a16;
+    --teal:#0d5c4d; --haldi:#e8a020; --kumkum:#b3352c; --rule:#cbb99a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden;
+    background:var(--paper); color:var(--ink);
+    font-family:baloo,"Noto Sans Devanagari","Hind Guntur",sans-serif; }
+  .stage { position:absolute; inset:0; }
+  /* paper grain + ledger rules */
+  .paper { position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse at 20% 10%, #f8f1e5 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 90%, #ead9bd 0%, transparent 50%),
+      var(--paper); }
+  .rules { position:absolute; inset:0; opacity:.5;
+    background:repeating-linear-gradient(to bottom,
+      transparent 0 46px, var(--rule) 46px 47px); }
+  .marginline { position:absolute; top:0; bottom:0; width:3px;
+    background:var(--kumkum); opacity:.5; left:7%; }
+  .grain { position:absolute; inset:0; opacity:.06;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E"); }
+
+  /* hand-drawn phone frame */
+  .phone { position:absolute; background:#0f0e0c; border-radius:34px;
+    padding:10px; box-shadow:0 18px 50px rgba(30,20,10,.35);
+    outline:3px solid var(--ink); outline-offset:-3px; }
+  .phone::after { content:""; position:absolute; top:18px; left:50%;
+    width:70px; height:8px; transform:translateX(-50%);
+    background:#2a2825; border-radius:4px; }
+  .phone video { width:100%; height:100%; object-fit:cover;
+    border-radius:26px; background:#111; }
+  .phone.fullvid { padding:0; }
+  .phone.fullvid video { border-radius:34px; }
+
+  /* supers — kinetic text */
+  .sup { position:absolute; font-weight:800; line-height:1.12;
+    text-align:center; transform:scale(0) rotate(-3deg); opacity:0; }
+  .sup.on { animation:slam .45s cubic-bezier(.2,1.6,.4,1) forwards; }
+  .sup.off { animation:fadeout .3s forwards; }
+  @keyframes slam { to { transform:scale(1) rotate(-1deg); opacity:1; } }
+  @keyframes fadeout { to { opacity:0; transform:scale(1.06); } }
+  .sup.big { font-size:72px; }
+  .sup.mid { font-size:52px; }
+  .sup.sm  { font-size:36px; font-weight:700; }
+  .sup.teal { color:var(--teal); }
+  .sup.kmkm { color:var(--kumkum); }
+  .sup.haldi { color:#a86f00; }
+  .sup.ink { color:var(--ink); }
+  .sup .hl { color:var(--teal); }
+
+  /* caption strip — silent-first readable */
+  .cap { position:absolute; left:50%; transform:translateX(-50%);
+    background:rgba(20,18,14,.88); color:#f4ece0; font-weight:600;
+    border-radius:14px; padding:10px 22px; font-size:30px;
+    max-width:86%; text-align:center; opacity:0; transition:opacity .25s; }
+  .cap.on { opacity:1; }
+  .cap b { color:var(--haldi); }
+
+  /* tiny labels */
+  .lbl { position:absolute; font-size:22px; font-weight:600;
+    color:#e8dcc6; background:rgba(20,18,14,.72); padding:5px 14px;
+    border-radius:9px; z-index:6; opacity:0; transition:opacity .3s; }
+  .lbl.on { opacity:.95; }
+
+  /* rubber stamp */
+  .stamp { position:absolute; font-size:64px; font-weight:900;
+    color:var(--kumkum); border:7px solid var(--kumkum);
+    padding:8px 30px; border-radius:14px; letter-spacing:2px;
+    transform:scale(2.6) rotate(10deg); opacity:0; }
+  .stamp.on { animation:stamp .38s cubic-bezier(.3,1.4,.5,1) forwards; }
+  @keyframes stamp { to { transform:scale(1) rotate(-8deg); opacity:.92; } }
+
+  /* rangoli corner */
+  .rangoli { position:absolute; width:150px; height:150px; opacity:.55;
+    pointer-events:none; }
+
+  /* ledger line that draws itself */
+  .draw { position:absolute; height:3px; background:var(--ink);
+    transform-origin:left; transform:scaleX(0); opacity:.8; }
+  .draw.on { animation:drawx .8s ease-out forwards; }
+  @keyframes drawx { to { transform:scaleX(1); } }
+
+  /* animated list rows (chaos/register illusion) */
+  .crow { position:absolute; left:0; right:0; height:34px;
+    border-bottom:3px solid var(--rule); }
+  .crow i { position:absolute; height:14px; border-radius:7px;
+    background:#b7a488; top:8px; }
+
+  /* generic keyframe helpers */
+  .rise { animation:rise .7s ease-out forwards; }
+  @keyframes rise { from { transform:translateY(60px); opacity:0; }
+    to { transform:translateY(0); opacity:1; } }
+  .pop { animation:pop .35s cubic-bezier(.2,1.7,.4,1) forwards;
+    transform:scale(0); }
+  @keyframes pop { to { transform:scale(1); } }
+  .wobble { animation:wob 1.6s ease-in-out infinite; }
+  @keyframes wob { 0%,100%{transform:rotate(-6deg)}
+    50%{transform:rotate(6deg)} }
+  .float { animation:flt 2.2s ease-in-out infinite; }
+  @keyframes flt { 0%,100%{transform:translateY(0)}
+    50%{transform:translateY(-14px)} }
+  .blink { animation:blk .9s steps(2) infinite; }
+  @keyframes blk { 50%{opacity:0} }
+
+  /* illustrated people (chaos scene) */
+  .person { position:absolute; width:120px; }
+  .person .head { width:74px; height:74px; border-radius:50%;
+    background:var(--ink); margin:0 auto; }
+  .person .body { width:120px; height:150px; margin-top:8px;
+    border-radius:60px 60px 20px 20px; background:var(--ink); }
+  .person .hand { position:absolute; width:66px; height:20px;
+    background:var(--ink); border-radius:10px; top:96px; }
+  .register { position:absolute; width:280px; height:200px;
+    background:#fbf6ea; border:4px solid var(--ink); border-radius:8px;
+    transform:rotate(-7deg); box-shadow:0 10px 0 rgba(0,0,0,.08); }
+  .register .pg { position:absolute; inset:10px; overflow:hidden; }
+  .register .ln { height:22px; border-bottom:2px solid var(--rule);
+    position:relative; }
+  .register .ln i { position:absolute; height:10px; top:4px;
+    border-radius:5px; background:#8d7c62; }
+  .register .tear { position:absolute; top:-4px; right:60px; width:0;
+    height:0; border-left:26px solid transparent;
+    border-bottom:30px solid var(--paper); }
+  .msgbubble { position:absolute; background:#dcf2e8;
+    border:3px solid var(--teal); color:var(--teal); font-weight:700;
+    border-radius:20px 20px 20px 4px; padding:12px 18px; font-size:26px;
+    box-shadow:0 6px 16px rgba(0,0,0,.12); }
+
+  /* end card book */
+  .book { position:absolute; width:520px; height:640px;
+    background:#fbf6ea; border:6px solid var(--ink); border-radius:14px;
+    box-shadow:0 24px 60px rgba(30,20,10,.3); overflow:hidden; }
+  .book .rules { opacity:.8; }
+  .wordmark { position:absolute; font-size:86px; font-weight:900;
+    color:var(--teal); }
+</style>
+</head>
+<body>
+<div class="stage" id="st"></div>
+<script>
+/* Scene registry. Each scene = [{at,do},...] timeline on the stage.
+   Spec comes from ?scene=N&fmt=16x9|9x16 */
+const P = new URLSearchParams(location.search);
+const fmt = P.get("fmt") || "16x9";
+const W = fmt === "9x16" ? 1080 : 1920, H = fmt === "9x16" ? 1920 : 1080;
+const st = document.getElementById("st");
+document.body.style.width = W + "px"; document.body.style.height = H + "px";
+
+const el = (cls, html, style) => {
+  const d = document.createElement("div");
+  d.className = cls; if (html) d.innerHTML = html;
+  if (style) Object.assign(d.style, style);
+  st.appendChild(d); return d;
+};
+const svgR = (x, y) => `<svg class="rangoli" style="left:${x}px;top:${y}px" viewBox="0 0 100 100">
+  <g fill="none" stroke="#b3352c" stroke-width="2">
+    <circle cx="50" cy="50" r="40"/><circle cx="50" cy="50" r="26"/>
+    <g>${Array.from({length:8},(_,i)=>`<line x1="50" y1="10" x2="50" y2="30" transform="rotate(${i*45} 50 50)"/>`).join("")}</g>
+  </g><circle cx="50" cy="50" r="8" fill="#e8a020"/></svg>`;
+
+function paperBase() {
+  el("paper"); el("rules");
+  el("marginline");
+  el("grain");
+  el("x").outerHTML = svgR(W - 150, 12) ;
+  el("y").outerHTML = svgR(4, H - 150);
+}
+function sup(text, cls, at, off, style) {
+  /* wrapper holds translateX(-50%); .sup animation owns scale/rotate */
+  const tr = (style.transform || "");
+  const cx = tr.includes("translateX");
+  const wstyle = Object.assign({}, style);
+  delete wstyle.transform;
+  /* centered wrappers must not shrink-to-fit: a 50%-left box only
+     gets the right half of the stage and wraps mid-text */
+  if (cx) { wstyle.width = "94%"; wstyle.textAlign = "center"; }
+  const wrap = el("", "", Object.assign({ position: "absolute",
+    transform: cx ? "translateX(-50%)" : "none" }, wstyle));
+  const s = document.createElement("div");
+  s.className = "sup " + cls; s.innerHTML = text;
+  s.style.position = "relative";
+  wrap.appendChild(s);
+  setTimeout(() => s.classList.add("on"), at * 1000);
+  if (off) setTimeout(() => s.classList.add("off"), off * 1000);
+  return wrap;
+}
+function cap(text, at, off, top, left) {
+  /* `left` lets 16x9 scenes park captions on the paper side of the
+     phone — anything under the screen rect is covered by footage */
+  const cs = { left: left || "50%" };
+  if (top) cs.top = top;
+  else cs.bottom = fmt === "9x16" ? "16%" : "4%";
+  const c = el("cap", text, cs);
+  setTimeout(() => c.classList.add("on"), at * 1000);
+  if (off) setTimeout(() => c.classList.remove("on"), off * 1000);
+}
+function label(text, at, style) {
+  if (fmt === "9x16" && style.bottom === "3%") {
+    /* stack in the left paper margin — clear of every screen rect
+       and out of the top-10%/bottom-15% unsafe bands */
+    style = style.right
+      ? { right: "3%", bottom: "18%" }
+      : { left: "1.5%", bottom: "18%", width: "152px",
+          fontSize: "20px" };
+  }
+  const l = el("lbl", text, style);
+  setTimeout(() => l.classList.add("on"), at * 1000);
+}
+function stamp(text, at, style) {
+  /* wrapper keeps translateX(-50%); the .stamp animation owns
+     scale/rotate so centering survives the keyframe */
+  const cx = (style.transform || "").includes("translateX");
+  const wrap = el("", "", { position: "absolute",
+    left: style.left || "50%", top: style.top || "40%",
+    width: cx ? "94%" : undefined, textAlign: cx ? "center" : undefined,
+    transform: cx ? "translateX(-50%)" : "none" });
+  const s = document.createElement("div");
+  s.className = "stamp"; s.textContent = text;
+  s.style.display = "inline-block";
+  s.style.position = "relative";
+  wrap.appendChild(s);
+  setTimeout(() => s.classList.add("on"), at * 1000);
+}
+/* Screen plate — real footage is composited over this rect in ffmpeg.
+   Geometry is exported via window.__rects for the compose step. */
+window.__rects = [];
+function phone(src, opts = {}) {
+  const w = opts.w || 500, h = opts.h || Math.round(w * 2.13);
+  const x = opts.x ?? (W - w) / 2, y = opts.y ?? (H - h) / 2;
+  // bezel ring (transparent hole = where footage goes)
+  el("phone", "", { width: w + "px", height: h + "px",
+    left: x + "px", top: y + "px" });
+  // screen plate (covered by footage in post; also the mask ref)
+  el("", "", { position: "absolute",
+    left: (x + (opts.full ? 0 : 10)) + "px",
+    top: (y + (opts.full ? 0 : 10)) + "px",
+    width: (w - (opts.full ? 0 : 20)) + "px",
+    height: (h - (opts.full ? 0 : 20)) + "px",
+    background: "#14120f", borderRadius: (opts.full ? 34 : 26) + "px" });
+  const pad = opts.full ? 0 : 10;
+  window.__rects.push({ src, start: opts.start || 0,
+    end: opts.end, wins: opts.wins || null,
+    x: x + pad, y: y + pad,
+    w: w - pad * 2, h: h - pad * 2, rot: 0,
+    r: opts.full ? 34 : 26 });
+  return null;
+}
+
+/* ---------------- scenes ---------------- */
+const SC = {
+/* S1 chaos — illustrated, labelled */
+1: () => { paperBase();
+  label("illustration", 0.4, { right: "3%", bottom: "3%" });
+  // three customers crowding
+  const mk = (x, y, sc, delay) => {
+    const p = el("person", `<div class="head"></div><div class="body">
+      <div class="hand" style="left:-40px;top:60px;transform:rotate(-30deg)"></div>
+      <div class="hand" style="right:-40px;top:60px;transform:rotate(30deg)"></div>
+      </div>`, { left: x + "px", top: y + "px",
+        transform: `scale(${sc})`, opacity: 0 });
+    p.classList.add("wobble");
+    p.style.animationDelay = delay + "s";
+    setTimeout(() => { p.style.opacity = 1; }, delay * 400);
+  };
+  if (fmt === "16x9") {
+    mk(W * .62, H * .24, 1.15, 0); mk(W * .74, H * .18, .95, .4);
+    mk(W * .68, H * .38, 1.3, .8);
+    const r = el("register wobble", `<div class="tear"></div>
+      <div class="pg">${Array.from({length:7},(_,i)=>
+        `<div class="ln"><i style="left:8px;width:${30+Math.random()*55}%"></i></div>`).join("")}
+      </div>`, { left: W * .12 + "px", top: H * .3 + "px" });
+  } else {
+    mk(W * .42, H * .26, 1.05, 0); mk(W * .62, H * .36, .9, .4);
+    mk(W * .5, H * .47, 1.2, .8);
+    el("register wobble", `<div class="tear"></div>
+      <div class="pg">${Array.from({length:7},(_,i)=>
+        `<div class="ln"><i style="left:8px;width:${30+Math.random()*55}%"></i></div>`).join("")}
+      </div>`, { left: W * .1 + "px", top: H * .64 + "px" });
+  }
+  sup("आधा लिखा.", "big kmkm", 0.9, null,
+    { left: "50%", top: fmt==="9x16" ? "12%" : "12%",
+      transform: "translateX(-50%)" });
+  sup("आधा याद.", "big ink", 1.9, null,
+    { left: "50%", top: fmt==="9x16" ? "18%" : "24%",
+      transform: "translateX(-50%)" });
+  cap("Subah aath baje. Teen customer ek saath. Aur khata? Wahi <b>phata hua register</b>.", 0.4, 4.2);
+},
+/* S2 turn — mic tap */
+2: () => { paperBase();
+  phone("hero.webm", { w: fmt==="9x16" ? 560 : 440,
+    y: fmt==="9x16" ? 295 : undefined,
+    wins: [[12.8, 15.4]], rot: -2 });
+  cap("Ab bas… <b>bolo</b>.", 0.4, 2.4, "",
+    fmt === "9x16" ? "" : "24%");
+  sup("bolo.", "big teal", 0.9, null,
+    { left: fmt==="9x16" ? "50%" : "18%",
+      top: fmt==="9x16" ? "11.5%" : "46%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
+},
+/* S3 magic — hero voice->bill */
+3: () => { paperBase();
+  phone("hero.webm", { w: fmt==="9x16" ? 560 : 500,
+    x: fmt==="9x16" ? (W-560)/2 : W * .30,
+    y: fmt==="9x16" ? 295 : undefined,
+    wins: [[14.5, 20], [24, 31.2]], rot: -1.5 });
+  label("voice recorded earlier, played into the app", 0.5,
+    { left: "3%", bottom: "3%" });
+  sup('"2 kilo cheeni, 1 Maggi,<br>500 gram dal, Ramesh ke naam"',
+    "sm ink", 0.8, 4.4, { left: fmt==="9x16" ? "50%" : "6%",
+      top: "8%", transform: fmt==="9x16" ? "translateX(-50%)" : "none",
+      textAlign: fmt==="9x16" ? "center" : "left" });
+  sup("₹174", "big teal", 7.6, 10.6,
+    { left: fmt==="9x16" ? "50%" : "68%",
+      top: fmt==="9x16" ? "10.5%" : "56%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
+  sup("Ramesh", "mid kmkm", 8.6, 10.6,
+    { left: fmt==="9x16" ? "50%" : "68%",
+      top: fmt==="9x16" ? "80%" : "70%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
+  stamp("LIKH DIYA", 11.8,
+    { left: fmt==="9x16" ? "50%" : "64%",
+      top: fmt==="9x16" ? "10%" : "38%",
+      transform: fmt==="9x16" ? "translateX(-50%) rotate(-8deg)" : "none" });
+  cap("Bill khud likh gaya — <b>real voice, real STT</b>", 4.6, 8.0,
+    "", fmt === "9x16" ? "" : "76%");
+  sup("Gnani Prisma:<br>asli awaaz, asli speech-to-text", "sm teal",
+    12.2, null, { left: fmt==="9x16" ? "50%" : "66%",
+      top: fmt==="9x16" ? "80%" : undefined,
+      bottom: fmt==="9x16" ? undefined : "8%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none",
+      textAlign: fmt==="9x16" ? "center" : "left" });
+},
+/* S4 trust — confirm page */
+4: () => { paperBase();
+  const ph = phone("trust.webm", { w: fmt==="9x16" ? 560 : 420,
+    x: fmt==="9x16" ? (W-560)/2 : W * .56,
+    y: fmt==="9x16" ? 295 : undefined, wins: [[7.5, 14.5]],
+    rot: 1.5 });
+  label("real confirm page — fresh customer profile", 0.5,
+    { left: "3%", bottom: "3%" });
+  // message bubble flying link
+  const bub = el("msgbubble", "khata link →",
+    { left: fmt==="9x16" ? "5%" : "10%", top: "34%", opacity: 0 });
+  setTimeout(() => { bub.style.opacity = 1; bub.classList.add("float"); },
+    700);
+  sup("bill uske phone pe", "mid ink", 0.8, 3.6,
+    { left: fmt==="9x16" ? "50%" : "8%",
+      top: fmt==="9x16" ? "11.5%" : "20%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none",
+      textAlign: fmt==="9x16" ? "center" : "left" });
+  stamp("CONFIRMED", 5.6,
+    { left: fmt==="9x16" ? "50%" : "30%",
+      top: fmt==="9x16" ? "79.5%" : "60%",
+      transform: fmt==="9x16" ? "translateX(-50%) rotate(-8deg)" : "none" });
+  sup("dono taraf confirm", "mid teal", 6.2, null,
+    { left: "50%", top: fmt==="9x16" ? "11.5%" : undefined,
+      bottom: fmt==="9x16" ? undefined : "12%",
+      transform: "translateX(-50%)" });
+  cap("Sahi hai ya galat — <b>dono ke saamne</b>. Jhagde kam.", 1.0, 5.2);
+},
+/* S5 ask-back */
+5: () => { paperBase();
+  phone("askback.webm", { w: fmt==="9x16" ? 560 : 500,
+    x: fmt==="9x16" ? (W-560)/2 : W * .52,
+    y: fmt==="9x16" ? 295 : undefined, wins: [[32.5, 39.9]],
+    rot: -1.5 });
+  label("voice recorded earlier; transcript then edited in-app", 0.5,
+    { left: "3%", bottom: "3%" });
+  sup('"face cream"?', "mid kmkm", 0.7, 2.6,
+    { left: fmt==="9x16" ? "50%" : "7%",
+      top: fmt==="9x16" ? "10.5%" : "16%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
+  sup("list me nahi.", "mid ink", 1.5, 3.2,
+    { left: fmt==="9x16" ? "50%" : "7%",
+      top: fmt==="9x16" ? "80%" : "30%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
+  sup("app <span class='hl'>poochta</span> hai,<br>andaaza nahi lagata",
+    "mid teal", 4.0, null,
+    { left: fmt==="9x16" ? "50%" : "7%",
+      top: fmt==="9x16" ? "9%" : "22%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none",
+      textAlign: fmt==="9x16" ? "center" : "left" });
+  cap("Naya item? Ek tap pe catalog me.", 4.6, 7.0, "",
+    fmt === "9x16" ? "" : "27%");
+  sup("jab pata na ho, poochta hai", "sm haldi", 5.8, null,
+    { left: "50%", top: fmt==="9x16" ? "78.8%" : undefined,
+      bottom: fmt==="9x16" ? undefined : "12%",
+      transform: "translateX(-50%)" });
+},
+/* S6 money */
+6: () => { paperBase();
+  phone("money.webm", { w: fmt==="9x16" ? 560 : 440,
+    x: fmt==="9x16" ? (W-560)/2 : W * .52,
+    y: fmt==="9x16" ? 295 : undefined, wins: [[42.0, 49.4]],
+    rot: 1.5 });
+  label("voice recorded earlier, played into the app", 0.5,
+    { left: "3%", bottom: "3%" });
+  const chip = (txt, at, x, y, c) => {
+    const s = sup(txt, "mid " + c, at, null,
+      { left: x, top: y });
+    return s; };
+  if (fmt === "9x16") {
+    chip("Cash ✓", 0.6, "6%", "22%", "teal");
+    chip("UPI QR", 4.8, "6%", "36%", "ink");
+    chip("Khata", 5.8, "6%", "50%", "kmkm");
+    chip("stock −2", 6.4, "6%", "64%", "haldi");
+  } else {
+    chip("Cash ✓", 0.6, "10%", "22%", "teal");
+    chip("UPI QR", 4.8, "10%", "36%", "ink");
+    chip("Khata", 5.8, "10%", "50%", "kmkm");
+    chip("stock −2", 6.4, "10%", "64%", "haldi");
+  }
+  sup("UPI: self-reported —<br>aap verify karte ho", "sm ink", 6.4, null,
+    { left: "50%", top: fmt==="9x16" ? "80%" : undefined,
+      bottom: fmt==="9x16" ? undefined : "13%",
+      transform: "translateX(-50%)" });
+  cap("Teeno tarike — <b>ek second</b> me.", 0.4, 3.4, "",
+    fmt === "9x16" ? "" : "26%");
+},
+/* S7 customer side */
+7: () => { paperBase();
+  phone("customer.webm", { w: fmt==="9x16" ? 560 : 460,
+    x: fmt==="9x16" ? (W-560)/2 : W * .5,
+    y: fmt==="9x16" ? 295 : undefined, wins: [[7.0, 13.3]],
+    rot: -1.5 });
+  sup("customer ka <span class='hl'>apna khata</span>",
+    fmt==="9x16" ? "mid ink" : "big ink", 0.8, 3.8,
+    { left: fmt==="9x16" ? "50%" : "8%",
+      top: fmt==="9x16" ? "11%" : "20%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none",
+      textAlign: fmt==="9x16" ? "center" : "left" });
+  sup("kitne dukaan, kitna kharcha — ek jagah", "mid teal", 4.2, null,
+    { left: fmt==="9x16" ? "50%" : "8%",
+      top: fmt==="9x16" ? "80%" : "46%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none",
+      textAlign: fmt==="9x16" ? "center" : "left" });
+  cap("QR scan → khata khul gaya.", 0.6, 3.6, "",
+    fmt === "9x16" ? "" : "26%");
+},
+/* S8 voice note */
+8: () => { paperBase();
+  phone("voicenote.webm", { w: fmt==="9x16" ? 560 : 500,
+    x: fmt==="9x16" ? (W-560)/2 : W * .48,
+    y: fmt==="9x16" ? 295 : undefined, wins: [[9.0, 15.4]],
+    rot: 1.5 });
+  sup('"paise maangna awkward hai?"', "mid ink", 0.6, 2.8,
+    { left: fmt==="9x16" ? "50%" : "6%",
+      top: fmt==="9x16" ? "11%" : "18%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
+  sup("app <span class='hl'>awaaz me</span> yaad dilaata hai",
+    "mid teal", 3.2, null,
+    { left: fmt==="9x16" ? "50%" : "6%",
+      top: fmt==="9x16" ? "78.8%" : "36%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none",
+      textAlign: fmt==="9x16" ? "center" : "left" });
+  cap("<b>voice-note reminder</b> — izzat se.", 4.0, 6.2, "",
+    fmt === "9x16" ? "" : "25%");
+},
+/* S9 shop runs itself — 3-up split */
+9: () => { paperBase();
+  const w3 = fmt === "9x16" ? 320 : 360;
+  const gap = fmt === "9x16" ? 24 : 30;
+  const x0 = (W - (w3 * 3 + gap * 2)) / 2;
+  const y = fmt === "9x16" ? H * .34 : H * .18;
+  phone("milk.webm", { w: w3, x: x0, y, wins: [[26, 30], [43, 47.8]],
+    rot: -2 });
+  phone("staff.webm", { w: w3, x: x0 + w3 + gap, y: y + 30,
+    wins: [[8.0, 16.8]], rot: 0 });
+  phone("weekly.webm", { w: w3, x: x0 + (w3 + gap) * 2, y: y + 60,
+    wins: [[24.0, 32.8]], rot: 2 });
+  const tags = ["doodh delivery", "staff + chhutti", "hafte ka hisaab"];
+  tags.forEach((t, i) => sup(t, "sm teal", 0.7 + i * 0.5, null,
+    { left: (x0 + (w3 + gap) * i) + "px",
+      top: (y - 54 + i * 30) + "px", width: w3 + "px" }));
+  sup("doodh · akhbaar · kirana · staff", "mid ink", 2.2, null,
+    { left: "50%", top: fmt==="9x16" ? "12%" : "8%",
+      transform: "translateX(-50%)" });
+  label("voice recorded earlier, played into the app", 0.5,
+    fmt === "9x16" ? { left: "1.5%", top: "25%", width: "160px",
+      fontSize: "20px" } : { left: "3%", bottom: "3%" });
+  cap("Assistant chalaye — <b>aap dekhte raho</b>.", 4.0, 8.2,
+    fmt === "9x16" ? "" : "11%");
+},
+/* S10 languages */
+10: () => { paperBase();
+  phone("onboarding.webm", { w: fmt==="9x16" ? 400 : 340,
+    x: fmt==="9x16" ? 70 : W * .26,
+    y: fmt==="9x16" ? 290 : undefined, wins: [[16.5, 22.5]],
+    rot: -2.5 });
+  phone("telugu.webm", { w: fmt==="9x16" ? 400 : 340,
+    x: fmt==="9x16" ? 610 : W * .56, y: fmt==="9x16" ? 950 : H*.22,
+    wins: [[20.0, 26.0]], rot: 2.5 });
+  label("voice recorded earlier, played into the app", 0.5,
+    fmt === "9x16" ? { left: "3%", top: "78%", width: "152px",
+      fontSize: "20px" } : { left: "3%", bottom: "3%" });
+  sup("Hinglish · <span class='hl'>తెలుగు</span> · English",
+    "big ink", 0.7, 3.8,
+    { left: "50%", top: fmt==="9x16" ? "10%" : "9%",
+      transform: "translateX(-50%)", whiteSpace: "nowrap" });
+  sup("apni dukaan jaisi", "mid teal", 4.2, null,
+    { left: fmt==="9x16" ? "72%" : "50%",
+      top: fmt==="9x16" ? "14%" : "22%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "translateX(-50%)" });
+},
+/* S11 proof — benchmark */
+11: () => { paperBase();
+  const ph = phone("benchmark.webm", { w: fmt==="9x16" ? 780 : 900,
+    x: fmt==="9x16" ? (W-780)/2 : W * .38, y: fmt==="9x16" ? H*.3 : H*.16,
+    h: fmt==="9x16" ? 760 : 560, wins: [[13.0, 20.0]], rot: -1, full: 1 });
+  sup("504 noisy runs.", "mid teal", 0.6, 3.4,
+    { left: fmt==="9x16" ? "50%" : "7%",
+      top: fmt==="9x16" ? "12%" : "16%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
+  sup("failures bhi public.", "mid kmkm", 1.8, 3.6,
+    { left: fmt==="9x16" ? "50%" : "7%",
+      top: fmt==="9x16" ? "17.5%" : "32%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
+  sup("shor me test kiya —<br>nateeje khulke", "mid ink", 4.2, null,
+    { left: fmt==="9x16" ? "50%" : "7%",
+      top: fmt==="9x16" ? "13.5%" : "24%",
+      transform: fmt==="9x16" ? "translateX(-50%)" : "none",
+      textAlign: fmt==="9x16" ? "center" : "left" });
+  cap("Clean 88% · traffic 80% · babble 68% — <b>real numbers, live page</b>", 4.8, 7.0);
+},
+/* S12 closer — book closes */
+12: () => { paperBase();
+  const bk = el("book", `<div class="rules"></div>
+    <div class="marginline" style="left:16%"></div>
+    <div style="position:absolute;top:44%;width:100%;text-align:center;
+      font-size:30px;color:#7a6a50;font-weight:700">bahi khata</div>`,
+    { left: (W - 520) / 2 + "px", top: (H - 640) / 2 + "px" });
+  bk.style.transformOrigin = "center bottom";
+  setTimeout(() => { bk.style.transition = "transform .9s cubic-bezier(.5,0,.8,.4), opacity .9s";
+    bk.style.transform = "perspective(1200px) rotateX(-72deg) scale(.9)";
+    bk.style.opacity = .0; }, 1600);
+  stamp("LIKH DIYA", 2.4, { left: "50%", top: "34%",
+    transform: "translateX(-50%) rotate(-8deg)" });
+  sup("Bolo. <span class='hl'>Khata likh gaya.</span>", "big teal", 3.2,
+    null, { left: "50%", top: fmt==="9x16" ? "46%" : "48%",
+      transform: "translateX(-50%)", whiteSpace: "nowrap" });
+  sup("India's voice-first ledger for dukaans", "mid ink", 4.2, null,
+    { left: "50%", top: fmt==="9x16" ? "58%" : "60%",
+      transform: "translateX(-50%)" });
+  sup("Built at IIT Bhilai · Built with Gnani AI: Prisma + Timbre",
+    "sm haldi", 5.0, null,
+    { left: "50%", top: fmt==="9x16" ? "68%" : "70%",
+      transform: "translateX(-50%)" });
+  sup("departed-asparagus-catalog.ngrok-free.dev", "sm teal", 5.8, null,
+    { left: "50%", top: fmt==="9x16" ? "75%" : "78%",
+      transform: "translateX(-50%)" });
+  sup("Narration: Gnani Timbre", "sm ink", 6.4, null,
+    { left: "50%", top: fmt==="9x16" ? "82%" : undefined,
+      bottom: fmt==="9x16" ? undefined : "6%",
+      transform: "translateX(-50%)",
+      fontSize: "24px", color: "#7a6a50" });
+},
+};
+
+const n = parseInt(P.get("scene") || "1", 10);
+paperBase && 0;
+SC[n]();
+/* signal done a beat after the scene's last scheduled beat */
+const DUR = { 1: 4.6, 2: 2.6, 3: 13.5, 4: 7.0, 5: 7.4, 6: 7.4, 7: 6.6,
+  8: 6.4, 9: 8.8, 10: 6.0, 11: 7.2, 12: 7.6 };
+setTimeout(() => { window.__done = true; }, (DUR[n] || 8) * 1000);
+</script>
+</body>
+</html>
