@@ -13,49 +13,62 @@ FF = (r"D:\Gnani\bolo-khata\backend\.venv\Lib\site-packages"
 
 DUR = {1:4.6, 2:2.6, 3:13.5, 4:7.0, 5:7.4, 6:7.4, 7:6.6,
        8:6.4, 9:8.8, 10:6.0, 11:7.2, 12:7.6}
-# cut -> [(scene, in_offset, length)]
-CUTS = {
-    "brand-90s": [(n, 0, DUR[n]) for n in range(1, 13)],
-    "brand-45s": [(n, 0, DUR[n]) for n in (1, 2, 3, 4, 6, 12)],
-    "brand-15s": [(1, 0, 4.6), (3, 8.5, 4.5), (12, 2.0, 5.6)],
-}
+DUR_TE = {1:7.8, 3:14.4, 4:7.6, 6:7.0, 12:10.6}  # TE narration is longer
+LANG = "hi"
+
+def vo(n):
+    return AUD + (r"\vo%02d.wav" % n if LANG == "hi"
+                  else r"\vo-%s-%02d.wav" % (LANG, n))
+
+# cut -> [(scene, in_offset, length)]  (built in main after LANG/DUR set)
+def make_cuts():
+    return {
+        "brand-90s": [(n, 0, DUR[n]) for n in range(1, 13)],
+        "brand-45s": [(n, 0, DUR[n]) for n in (1, 2, 3, 4, 6, 12)],
+        "brand-15s": [(1, 0, min(4.6, DUR[1])), (3, 8.5, 4.5),
+                      (12, 2.0, 8.6 if LANG == "te" else 5.6)],
+    }
 # audio events: (scene, offset_in_scene, file, gain_db)
-AUDIO = [
-    (1, 0.10, AUD + r"\vo01.wav", 0),
-    (2, 0.15, AUD + r"\vo02.wav", 0),
-    (2, 0.90, AUD + r"\pop.wav", -6),
-    (3, 0.15, AUD + r"\vo03.wav", 0),
-    (3, 0.60, VOICE + r"\hero_lead.wav", -2),
-    (3, 11.8, AUD + r"\thud.wav", -4),
-    (4, 0.15, AUD + r"\vo04.wav", 0),
-    (4, 5.60, AUD + r"\thud.wav", -4),
-    (5, 0.15, AUD + r"\vo05.wav", 0),
-    (5, 0.50, AUD + r"\pop.wav", -8),
-    (6, 0.15, AUD + r"\vo06.wav", 0),
-    (6, 4.80, AUD + r"\ting.wav", -3),
-    (6, 5.80, AUD + r"\ting.wav", -6),
-    (7, 0.15, AUD + r"\vo07.wav", 0),
-    (8, 0.15, AUD + r"\vo08.wav", 0),
-    (8, 1.60, AUD + r"\reminder.wav", -3),
-    (8, 4.40, AUD + r"\reminder-te.wav", -3),
-    (9, 0.15, AUD + r"\vo09.wav", 0),
-    (10, 0.15, AUD + r"\vo10.wav", 0),
-    (10, 2.20, VOICE + r"\telugu_lead.wav", -2),
-    (10, 3.20, AUD + r"\te-readback.wav", -2),
-    (11, 0.15, AUD + r"\vo11.wav", 0),
-    (12, 0.15, AUD + r"\vo12.wav", 0),
-    (12, 2.40, AUD + r"\thud.wav", -4),
-]
+def make_audio():
+    return [
+        (1, 0.10, vo(1), 0),
+        (2, 0.15, vo(2), 0),
+        (2, 0.90, AUD + r"\pop.wav", -6),
+        (3, 0.15, vo(3), 0),
+        (3, 0.60, VOICE + r"\hero_lead.wav", -2),
+        (3, 11.8, AUD + r"\thud.wav", -4),
+        (4, 0.15, vo(4), 0),
+        (4, 5.60, AUD + r"\thud.wav", -4),
+        (5, 0.15, vo(5), 0),
+        (5, 0.50, AUD + r"\pop.wav", -8),
+        (6, 0.15, vo(6), 0),
+        (6, 4.80, AUD + r"\ting.wav", -3),
+        (6, 5.80, AUD + r"\ting.wav", -6),
+        (7, 0.15, vo(7), 0),
+        (8, 0.15, vo(8), 0),
+        (8, 1.60, AUD + r"\reminder.wav", -3),
+        (8, 4.40, AUD + r"\reminder-te.wav", -3),
+        (9, 0.15, vo(9), 0),
+        (10, 0.15, vo(10), 0),
+        (10, 2.20, VOICE + r"\telugu_lead.wav", -2),
+        (10, 3.20, AUD + r"\te-readback.wav", -2),
+        (11, 0.15, vo(11), 0),
+        (12, 0.15, vo(12), 0),
+        (12, 2.40, AUD + r"\thud.wav", -4),
+    ]
 # absolute-time overrides for trimmed cuts: (abs_t, file, gain_db)
-AUDIO_ABS = {
-    "brand-15s": [
-        (0.1, AUD + r"\vo01.wav", 0),
-        (5.0, VOICE + r"\hero_lead.wav", -2),
-        (7.8, AUD + r"\thud.wav", -4),
-        (9.3, AUD + r"\vo12.wav", 0),
-        (11.5, AUD + r"\thud.wav", -4),
-    ],
-}
+def make_audio_abs():
+    # TE vo01 is ~7.5s — push the shopkeeper clip + stamp past its tail
+    sh = 2.6 if LANG == "te" else 0.0
+    return {
+        "brand-15s": [
+            (0.1, vo(1), 0),
+            (5.0 + sh, VOICE + r"\hero_lead.wav", -2),
+            (7.8 + sh, AUD + r"\thud.wav", -4),
+            (9.3 + sh, vo(12), 0),
+            (11.5 + sh, AUD + r"\thud.wav", -4),
+        ],
+    }
 
 def sh(cmd):
     r = subprocess.run(cmd, capture_output=True, text=True,
@@ -169,10 +182,20 @@ def two_pass_loudnorm(silent, ain, afc, total, final):
 
 def main():
     fmt = sys.argv[1] if len(sys.argv) > 1 else "16x9"
+    global LANG, CUTS, AUDIO, AUDIO_ABS
+    LANG = "hi"
+    if "--lang" in sys.argv:
+        LANG = sys.argv[sys.argv.index("--lang") + 1]
+    if LANG == "te":
+        DUR.update(DUR_TE)
+    CUTS = make_cuts()
+    AUDIO = make_audio()
+    AUDIO_ABS = make_audio_abs()
+    ltag = "" if LANG == "hi" else f"-{LANG}"
     os.makedirs(OUT + "\\work", exist_ok=True)
     comp = {}
     for n in DUR:
-        tag = f"seg-{n:02d}-{fmt}"
+        tag = f"seg-{n:02d}{ltag}-{fmt}"
         meta = json.load(open(OUT + f"\\{tag}.json"))
         dst = OUT + f"\\work\\{tag}-comp.mp4"
         if not os.path.exists(dst) or "--recomp" in sys.argv:
@@ -181,7 +204,7 @@ def main():
         print("composited", tag)
 
     for cut, parts in CUTS.items():
-        name = f"{cut}-{fmt}"
+        name = f"{cut}{ltag}-{fmt}"
         total = sum(ln for _, _, ln in parts)
         lst = OUT + f"\\work\\{name}.txt"
         with open(lst, "w") as f:

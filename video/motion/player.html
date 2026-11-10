@@ -13,7 +13,8 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { width:100%; height:100%; overflow:hidden;
     background:var(--paper); color:var(--ink);
-    font-family:baloo,"Noto Sans Devanagari","Hind Guntur",sans-serif; }
+    font-family:baloo,"Noto Sans Devanagari","Hind Guntur",
+    "Nirmala UI","Noto Sans Telugu",sans-serif; }
   .stage { position:absolute; inset:0; }
   /* paper grain + ledger rules */
   .paper { position:absolute; inset:0;
@@ -151,6 +152,115 @@
    Spec comes from ?scene=N&fmt=16x9|9x16 */
 const P = new URLSearchParams(location.search);
 const fmt = P.get("fmt") || "16x9";
+const lang = P.get("lang") || "hi";
+/* On-screen strings per language. Brand line, stamps, product terms
+   and the spoken quote stay identical across versions — they're the
+   film's identity, not narration. */
+const STR = {
+hi: {
+  s1_label: "illustration",
+  s1_a: "आधा लिखा.", s1_b: "आधा याद.",
+  s1_cap: "Subah aath baje. Teen customer ek saath. Aur khata? Wahi <b>phata hua register</b>.",
+  s2_cap: "Ab bas… <b>bolo</b>.", s2_bolo: "bolo.",
+  s3_label: "voice recorded earlier, played into the app",
+  s3_cap: "Bill khud likh gaya — <b>real voice, real STT</b>",
+  s3_prisma: "Gnani Prisma:<br>asli awaaz, asli speech-to-text",
+  s4_label: "real confirm page — fresh customer profile",
+  s4_bubble: "khata link →", s4_a: "bill uske phone pe",
+  s4_b: "dono taraf confirm",
+  s4_cap: "Sahi hai ya galat — <b>dono ke saamne</b>. Jhagde kam.",
+  s5_label: "voice recorded earlier; transcript then edited in-app",
+  s5_a: '"face cream"?', s5_b: "list me nahi.",
+  s5_c: "app <span class='hl'>poochta</span> hai,<br>andaaza nahi lagata",
+  s5_cap: "Naya item? Ek tap pe catalog me.",
+  s5_d: "jab pata na ho, poochta hai",
+  s6_upi: "UPI: self-reported —<br>aap verify karte ho",
+  s6_cap: "Teeno tarike — <b>ek second</b> me.",
+  s7_a: "customer ka <span class='hl'>apna khata</span>",
+  s7_b: "kitne dukaan, kitna kharcha — ek jagah",
+  s7_cap: "QR scan → khata khul gaya.",
+  s8_a: '"paise maangna awkward hai?"',
+  s8_b: "app <span class='hl'>awaaz me</span> yaad dilaata hai",
+  s8_cap: "<b>voice-note reminder</b> — izzat se.",
+  s9_tags: ["doodh delivery", "staff + chhutti", "hafte ka hisaab"],
+  s9_a: "doodh · akhbaar · kirana · staff",
+  s9_cap: "Assistant chalaye — <b>aap dekhte raho</b>.",
+  s10_b: "apni dukaan jaisi",
+  s11_a: "504 noisy runs.", s11_b: "failures bhi public.",
+  s11_c: "shor me test kiya —<br>nateeje khulke",
+  s11_cap: "Clean 88% · traffic 80% · babble 68% — <b>real numbers, live page</b>",
+  s12_book: "bahi khata",
+},
+en: {
+  s1_label: "illustration",
+  s1_a: "half written.", s1_b: "half remembered.",
+  s1_cap: "8 AM. Three customers at once. And the ledger? That same <b>torn register</b>.",
+  s2_cap: "Now just… <b>speak</b>.", s2_bolo: "bolo.",
+  s3_label: "voice recorded earlier, played into the app",
+  s3_cap: "The bill wrote itself — <b>real voice, real STT</b>",
+  s3_prisma: "Gnani Prisma:<br>real voice, real speech-to-text",
+  s4_label: "real confirm page — fresh customer profile",
+  s4_bubble: "khata link →", s4_a: "the bill on their phone",
+  s4_b: "confirmed on both sides",
+  s4_cap: "Right or wrong — <b>in front of both</b>. Fewer fights.",
+  s5_label: "voice recorded earlier; transcript then edited in-app",
+  s5_a: '"face cream"?', s5_b: "not in the list.",
+  s5_c: "the app <span class='hl'>asks</span>,<br>doesn't guess",
+  s5_cap: "New item? One tap adds it to the catalog.",
+  s5_d: "when unsure, it asks",
+  s6_upi: "UPI: self-reported —<br>you verify",
+  s6_cap: "Three ways — in <b>one second</b>.",
+  s7_a: "the customer's <span class='hl'>own khata</span>",
+  s7_b: "every shop, every expense — one place",
+  s7_cap: "Scan the QR → khata opens.",
+  s8_a: '"asking for money is awkward?"',
+  s8_b: "the app reminds <span class='hl'>in voice</span>",
+  s8_cap: "<b>voice-note reminder</b> — politely.",
+  s9_tags: ["milk delivery", "staff + leave", "weekly accounts"],
+  s9_a: "milk · newspaper · kirana · staff",
+  s9_cap: "Assistant runs it — <b>you keep watch</b>.",
+  s10_b: "just like your shop",
+  s11_a: "504 noisy runs.", s11_b: "failures are public too.",
+  s11_c: "tested in noise —<br>results out in the open",
+  s11_cap: "Clean 88% · traffic 80% · babble 68% — <b>real numbers, live page</b>",
+  s12_book: "bahi khata",
+},
+te: {
+  s1_label: "చిత్రణ",
+  s1_a: "సగం రాశారు.", s1_b: "సగం గుర్తు.",
+  s1_cap: "ఉదయం ఎనిమిదికి. ముగ్గురు కస్టమర్లు ఒకేసారి. ఖాతా? అదే <b>చిరిగిన రిజిస్టరు</b>.",
+  s2_cap: "ఇప్పుడు కేవలం… <b>చెప్పండి</b>.", s2_bolo: "చెప్పండి.",
+  s3_label: "వాయిస్ ముందే రికార్డ్ చేసి, యాప్‌లో ప్లే చేశాం",
+  s3_cap: "బిల్లు తనంతట తానే రాసింది — <b>నిజమైన వాయిస్, నిజమైన STT</b>",
+  s3_prisma: "Gnani Prisma:<br>నిజమైన వాయిస్, నిజమైన స్పీచ్-టు-టెక్స్ట్",
+  s4_label: "నిజమైన confirm పేజీ — కొత్త కస్టమర్ ప్రొఫైల్",
+  s4_bubble: "ఖాతా లింక్ →", s4_a: "బిల్లు వాళ్ల ఫోన్‌లో",
+  s4_b: "రెండు వైపులా confirm",
+  s4_cap: "సరైనదా తప్పా — <b>ఇద్దరి ముందు</b>. గొడవలు తగ్గుతాయి.",
+  s5_label: "వాయిస్ ముందే రికార్డ్; ట్రాన్స్‌క్రిప్ట్ యాప్‌లోనే సవరించాం",
+  s5_a: '"face cream"?', s5_b: "లిస్టులో లేదు.",
+  s5_c: "యాప్ <span class='hl'>అడుగుతుంది</span>,<br>అంచనా వేయదు",
+  s5_cap: "కొత్త ఐటమా? ఒకే ట్యాప్‌తో కేటలాగ్‌లోకి.",
+  s5_d: "తెలియకపోతే, అడుగుతుంది",
+  s6_upi: "UPI: స్వయం-నివేదిక —<br>మీరే ధృవీకరిస్తారు",
+  s6_cap: "మూడు మార్గాలు — <b>ఒక్క సెకనులో</b>.",
+  s7_a: "కస్టమర్ <span class='hl'>స్వంత ఖాతా</span>",
+  s7_b: "ఎన్ని దుకాణాలు, ఎంత ఖర్చు — ఒకే చోట",
+  s7_cap: "QR స్కాన్ → ఖాతా తెరుస్తుంది.",
+  s8_a: '"డబ్బు అడగడం ఇబ్బందిగా ఉందా?"',
+  s8_b: "యాప్ <span class='hl'>వాయిస్‌లో</span> గుర్తు చేస్తుంది",
+  s8_cap: "<b>వాయిస్-నోట్ రిమైండర్</b> — గౌరవంగా.",
+  s9_tags: ["పాల డెలివరీ", "స్టాఫ్ + సెలవు", "వారపు లెక్క"],
+  s9_a: "పాలు · పేపరు · కిరాణా · స్టాఫ్",
+  s9_cap: "అసిస్టెంట్ నడుపుతాడు — <b>మీరు చూసుకోండి</b>.",
+  s10_b: "మీ దుకాణం లాగానే",
+  s11_a: "504 శబ్దపు పరీక్షలు.", s11_b: "తప్పులు కూడా బహిరంగం.",
+  s11_c: "శబ్దంలో పరీక్షించాం —<br>ఫలితాలు బహిరంగంగా",
+  s11_cap: "Clean 88% · traffic 80% · babble 68% — <b>నిజమైన సంఖ్యలు, ప్రత్యక్ష పేజీ</b>",
+  s12_book: "బాహీ ఖాతా",
+},
+};
+const T = (k) => (STR[lang] && STR[lang][k]) || STR.hi[k] || k;
 const W = fmt === "9x16" ? 1080 : 1920, H = fmt === "9x16" ? 1920 : 1080;
 const st = document.getElementById("st");
 document.body.style.width = W + "px"; document.body.style.height = H + "px";
@@ -259,7 +369,7 @@ function phone(src, opts = {}) {
 const SC = {
 /* S1 chaos — illustrated, labelled */
 1: () => { paperBase();
-  label("illustration", 0.4, { right: "3%", bottom: "3%" });
+  label(T("s1_label"), 0.4, { right: "3%", bottom: "3%" });
   // three customers crowding
   const mk = (x, y, sc, delay) => {
     const p = el("person", `<div class="head"></div><div class="body">
@@ -272,8 +382,8 @@ const SC = {
     setTimeout(() => { p.style.opacity = 1; }, delay * 400);
   };
   if (fmt === "16x9") {
-    mk(W * .62, H * .24, 1.15, 0); mk(W * .74, H * .18, .95, .4);
-    mk(W * .68, H * .38, 1.3, .8);
+    mk(W * .70, H * .24, 1.15, 0); mk(W * .82, H * .18, .95, .4);
+    mk(W * .76, H * .38, 1.3, .8);
     const r = el("register wobble", `<div class="tear"></div>
       <div class="pg">${Array.from({length:7},(_,i)=>
         `<div class="ln"><i style="left:8px;width:${30+Math.random()*55}%"></i></div>`).join("")}
@@ -286,22 +396,22 @@ const SC = {
         `<div class="ln"><i style="left:8px;width:${30+Math.random()*55}%"></i></div>`).join("")}
       </div>`, { left: W * .1 + "px", top: H * .64 + "px" });
   }
-  sup("आधा लिखा.", "big kmkm", 0.9, null,
+  sup(T("s1_a"), "big kmkm", 0.9, null,
     { left: "50%", top: fmt==="9x16" ? "12%" : "12%",
       transform: "translateX(-50%)" });
-  sup("आधा याद.", "big ink", 1.9, null,
+  sup(T("s1_b"), "big ink", 1.9, null,
     { left: "50%", top: fmt==="9x16" ? "18%" : "24%",
       transform: "translateX(-50%)" });
-  cap("Subah aath baje. Teen customer ek saath. Aur khata? Wahi <b>phata hua register</b>.", 0.4, 4.2);
+  cap(T("s1_cap"), 0.4, 4.2);
 },
 /* S2 turn — mic tap */
 2: () => { paperBase();
   phone("hero.webm", { w: fmt==="9x16" ? 560 : 440,
     y: fmt==="9x16" ? 295 : undefined,
-    wins: [[12.8, 15.4]], rot: -2 });
-  cap("Ab bas… <b>bolo</b>.", 0.4, 2.4, "",
+    wins: [[8, 10.6]], rot: -2 });
+  cap(T("s2_cap"), 0.4, 2.4, "",
     fmt === "9x16" ? "" : "24%");
-  sup("bolo.", "big teal", 0.9, null,
+  sup(T("s2_bolo"), "big teal", 0.9, null,
     { left: fmt==="9x16" ? "50%" : "18%",
       top: fmt==="9x16" ? "11.5%" : "46%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
@@ -311,8 +421,8 @@ const SC = {
   phone("hero.webm", { w: fmt==="9x16" ? 560 : 500,
     x: fmt==="9x16" ? (W-560)/2 : W * .30,
     y: fmt==="9x16" ? 295 : undefined,
-    wins: [[14.5, 20], [24, 31.2]], rot: -1.5 });
-  label("voice recorded earlier, played into the app", 0.5,
+    wins: [[13.5, 19], [21.5, 27]], rot: -1.5 });
+  label(T("s3_label"), 0.5,
     { left: "3%", bottom: "3%" });
   sup('"2 kilo cheeni, 1 Maggi,<br>500 gram dal, Ramesh ke naam"',
     "sm ink", 0.8, 4.4, { left: fmt==="9x16" ? "50%" : "6%",
@@ -330,9 +440,9 @@ const SC = {
     { left: fmt==="9x16" ? "50%" : "64%",
       top: fmt==="9x16" ? "10%" : "38%",
       transform: fmt==="9x16" ? "translateX(-50%) rotate(-8deg)" : "none" });
-  cap("Bill khud likh gaya — <b>real voice, real STT</b>", 4.6, 8.0,
+  cap(T("s3_cap"), 4.6, 8.0,
     "", fmt === "9x16" ? "" : "76%");
-  sup("Gnani Prisma:<br>asli awaaz, asli speech-to-text", "sm teal",
+  sup(T("s3_prisma"), "sm teal",
     12.2, null, { left: fmt==="9x16" ? "50%" : "66%",
       top: fmt==="9x16" ? "80%" : undefined,
       bottom: fmt==="9x16" ? undefined : "8%",
@@ -345,14 +455,14 @@ const SC = {
     x: fmt==="9x16" ? (W-560)/2 : W * .56,
     y: fmt==="9x16" ? 295 : undefined, wins: [[7.5, 14.5]],
     rot: 1.5 });
-  label("real confirm page — fresh customer profile", 0.5,
+  label(T("s4_label"), 0.5,
     { left: "3%", bottom: "3%" });
   // message bubble flying link
-  const bub = el("msgbubble", "khata link →",
+  const bub = el("msgbubble", T("s4_bubble"),
     { left: fmt==="9x16" ? "5%" : "10%", top: "34%", opacity: 0 });
   setTimeout(() => { bub.style.opacity = 1; bub.classList.add("float"); },
     700);
-  sup("bill uske phone pe", "mid ink", 0.8, 3.6,
+  sup(T("s4_a"), "mid ink", 0.8, 3.6,
     { left: fmt==="9x16" ? "50%" : "8%",
       top: fmt==="9x16" ? "11.5%" : "20%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none",
@@ -361,37 +471,37 @@ const SC = {
     { left: fmt==="9x16" ? "50%" : "30%",
       top: fmt==="9x16" ? "79.5%" : "60%",
       transform: fmt==="9x16" ? "translateX(-50%) rotate(-8deg)" : "none" });
-  sup("dono taraf confirm", "mid teal", 6.2, null,
+  sup(T("s4_b"), "mid teal", 6.2, null,
     { left: "50%", top: fmt==="9x16" ? "11.5%" : undefined,
       bottom: fmt==="9x16" ? undefined : "12%",
       transform: "translateX(-50%)" });
-  cap("Sahi hai ya galat — <b>dono ke saamne</b>. Jhagde kam.", 1.0, 5.2);
+  cap(T("s4_cap"), 1.0, 5.2);
 },
 /* S5 ask-back */
 5: () => { paperBase();
   phone("askback.webm", { w: fmt==="9x16" ? 560 : 500,
     x: fmt==="9x16" ? (W-560)/2 : W * .52,
-    y: fmt==="9x16" ? 295 : undefined, wins: [[32.5, 39.9]],
+    y: fmt==="9x16" ? 295 : undefined, wins: [[20, 27]],
     rot: -1.5 });
-  label("voice recorded earlier; transcript then edited in-app", 0.5,
+  label(T("s5_label"), 0.5,
     { left: "3%", bottom: "3%" });
-  sup('"face cream"?', "mid kmkm", 0.7, 2.6,
+  sup(T("s5_a"), "mid kmkm", 0.7, 2.6,
     { left: fmt==="9x16" ? "50%" : "7%",
       top: fmt==="9x16" ? "10.5%" : "16%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
-  sup("list me nahi.", "mid ink", 1.5, 3.2,
+  sup(T("s5_b"), "mid ink", 1.5, 3.2,
     { left: fmt==="9x16" ? "50%" : "7%",
       top: fmt==="9x16" ? "80%" : "30%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
-  sup("app <span class='hl'>poochta</span> hai,<br>andaaza nahi lagata",
+  sup(T("s5_c"),
     "mid teal", 4.0, null,
     { left: fmt==="9x16" ? "50%" : "7%",
       top: fmt==="9x16" ? "9%" : "22%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none",
       textAlign: fmt==="9x16" ? "center" : "left" });
-  cap("Naya item? Ek tap pe catalog me.", 4.6, 7.0, "",
+  cap(T("s5_cap"), 4.6, 7.0, "",
     fmt === "9x16" ? "" : "27%");
-  sup("jab pata na ho, poochta hai", "sm haldi", 5.8, null,
+  sup(T("s5_d"), "sm haldi", 5.8, null,
     { left: "50%", top: fmt==="9x16" ? "78.8%" : undefined,
       bottom: fmt==="9x16" ? undefined : "12%",
       transform: "translateX(-50%)" });
@@ -402,7 +512,7 @@ const SC = {
     x: fmt==="9x16" ? (W-560)/2 : W * .52,
     y: fmt==="9x16" ? 295 : undefined, wins: [[42.0, 49.4]],
     rot: 1.5 });
-  label("voice recorded earlier, played into the app", 0.5,
+  label(T("s3_label"), 0.5,
     { left: "3%", bottom: "3%" });
   const chip = (txt, at, x, y, c) => {
     const s = sup(txt, "mid " + c, at, null,
@@ -419,11 +529,11 @@ const SC = {
     chip("Khata", 5.8, "10%", "50%", "kmkm");
     chip("stock −2", 6.4, "10%", "64%", "haldi");
   }
-  sup("UPI: self-reported —<br>aap verify karte ho", "sm ink", 6.4, null,
+  sup(T("s6_upi"), "sm ink", 6.4, null,
     { left: "50%", top: fmt==="9x16" ? "80%" : undefined,
       bottom: fmt==="9x16" ? undefined : "13%",
       transform: "translateX(-50%)" });
-  cap("Teeno tarike — <b>ek second</b> me.", 0.4, 3.4, "",
+  cap(T("s6_cap"), 0.4, 3.4, "",
     fmt === "9x16" ? "" : "26%");
 },
 /* S7 customer side */
@@ -432,18 +542,18 @@ const SC = {
     x: fmt==="9x16" ? (W-560)/2 : W * .5,
     y: fmt==="9x16" ? 295 : undefined, wins: [[7.0, 13.3]],
     rot: -1.5 });
-  sup("customer ka <span class='hl'>apna khata</span>",
+  sup(T("s7_a"),
     fmt==="9x16" ? "mid ink" : "big ink", 0.8, 3.8,
     { left: fmt==="9x16" ? "50%" : "8%",
       top: fmt==="9x16" ? "11%" : "20%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none",
       textAlign: fmt==="9x16" ? "center" : "left" });
-  sup("kitne dukaan, kitna kharcha — ek jagah", "mid teal", 4.2, null,
+  sup(T("s7_b"), "mid teal", 4.2, null,
     { left: fmt==="9x16" ? "50%" : "8%",
       top: fmt==="9x16" ? "80%" : "46%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none",
       textAlign: fmt==="9x16" ? "center" : "left" });
-  cap("QR scan → khata khul gaya.", 0.6, 3.6, "",
+  cap(T("s7_cap"), 0.6, 3.6, "",
     fmt === "9x16" ? "" : "26%");
 },
 /* S8 voice note */
@@ -452,17 +562,17 @@ const SC = {
     x: fmt==="9x16" ? (W-560)/2 : W * .48,
     y: fmt==="9x16" ? 295 : undefined, wins: [[9.0, 15.4]],
     rot: 1.5 });
-  sup('"paise maangna awkward hai?"', "mid ink", 0.6, 2.8,
+  sup(T("s8_a"), "mid ink", 0.6, 2.8,
     { left: fmt==="9x16" ? "50%" : "6%",
       top: fmt==="9x16" ? "11%" : "18%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
-  sup("app <span class='hl'>awaaz me</span> yaad dilaata hai",
+  sup(T("s8_b"),
     "mid teal", 3.2, null,
     { left: fmt==="9x16" ? "50%" : "6%",
       top: fmt==="9x16" ? "78.8%" : "36%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none",
       textAlign: fmt==="9x16" ? "center" : "left" });
-  cap("<b>voice-note reminder</b> — izzat se.", 4.0, 6.2, "",
+  cap(T("s8_cap"), 4.0, 6.2, "",
     fmt === "9x16" ? "" : "25%");
 },
 /* S9 shop runs itself — 3-up split */
@@ -477,17 +587,17 @@ const SC = {
     wins: [[8.0, 16.8]], rot: 0 });
   phone("weekly.webm", { w: w3, x: x0 + (w3 + gap) * 2, y: y + 60,
     wins: [[24.0, 32.8]], rot: 2 });
-  const tags = ["doodh delivery", "staff + chhutti", "hafte ka hisaab"];
+  const tags = T("s9_tags");
   tags.forEach((t, i) => sup(t, "sm teal", 0.7 + i * 0.5, null,
     { left: (x0 + (w3 + gap) * i) + "px",
       top: (y - 54 + i * 30) + "px", width: w3 + "px" }));
-  sup("doodh · akhbaar · kirana · staff", "mid ink", 2.2, null,
+  sup(T("s9_a"), "mid ink", 2.2, null,
     { left: "50%", top: fmt==="9x16" ? "12%" : "8%",
       transform: "translateX(-50%)" });
-  label("voice recorded earlier, played into the app", 0.5,
+  label(T("s3_label"), 0.5,
     fmt === "9x16" ? { left: "1.5%", top: "25%", width: "160px",
       fontSize: "20px" } : { left: "3%", bottom: "3%" });
-  cap("Assistant chalaye — <b>aap dekhte raho</b>.", 4.0, 8.2,
+  cap(T("s9_cap"), 4.0, 8.2,
     fmt === "9x16" ? "" : "11%");
 },
 /* S10 languages */
@@ -499,14 +609,14 @@ const SC = {
   phone("telugu.webm", { w: fmt==="9x16" ? 400 : 340,
     x: fmt==="9x16" ? 610 : W * .56, y: fmt==="9x16" ? 950 : H*.22,
     wins: [[20.0, 26.0]], rot: 2.5 });
-  label("voice recorded earlier, played into the app", 0.5,
+  label(T("s3_label"), 0.5,
     fmt === "9x16" ? { left: "3%", top: "78%", width: "152px",
       fontSize: "20px" } : { left: "3%", bottom: "3%" });
   sup("Hinglish · <span class='hl'>తెలుగు</span> · English",
     "big ink", 0.7, 3.8,
     { left: "50%", top: fmt==="9x16" ? "10%" : "9%",
       transform: "translateX(-50%)", whiteSpace: "nowrap" });
-  sup("apni dukaan jaisi", "mid teal", 4.2, null,
+  sup(T("s10_b"), "mid teal", 4.2, null,
     { left: fmt==="9x16" ? "72%" : "50%",
       top: fmt==="9x16" ? "14%" : "22%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "translateX(-50%)" });
@@ -516,27 +626,27 @@ const SC = {
   const ph = phone("benchmark.webm", { w: fmt==="9x16" ? 780 : 900,
     x: fmt==="9x16" ? (W-780)/2 : W * .38, y: fmt==="9x16" ? H*.3 : H*.16,
     h: fmt==="9x16" ? 760 : 560, wins: [[13.0, 20.0]], rot: -1, full: 1 });
-  sup("504 noisy runs.", "mid teal", 0.6, 3.4,
+  sup(T("s11_a"), "mid teal", 0.6, 3.4,
     { left: fmt==="9x16" ? "50%" : "7%",
       top: fmt==="9x16" ? "12%" : "16%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
-  sup("failures bhi public.", "mid kmkm", 1.8, 3.6,
+  sup(T("s11_b"), "mid kmkm", 1.8, 3.6,
     { left: fmt==="9x16" ? "50%" : "7%",
       top: fmt==="9x16" ? "17.5%" : "32%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none" });
-  sup("shor me test kiya —<br>nateeje khulke", "mid ink", 4.2, null,
+  sup(T("s11_c"), "mid ink", 4.2, null,
     { left: fmt==="9x16" ? "50%" : "7%",
       top: fmt==="9x16" ? "13.5%" : "24%",
       transform: fmt==="9x16" ? "translateX(-50%)" : "none",
       textAlign: fmt==="9x16" ? "center" : "left" });
-  cap("Clean 88% · traffic 80% · babble 68% — <b>real numbers, live page</b>", 4.8, 7.0);
+  cap(T("s11_cap"), 4.8, 7.0);
 },
 /* S12 closer — book closes */
 12: () => { paperBase();
   const bk = el("book", `<div class="rules"></div>
     <div class="marginline" style="left:16%"></div>
     <div style="position:absolute;top:44%;width:100%;text-align:center;
-      font-size:30px;color:#7a6a50;font-weight:700">bahi khata</div>`,
+      font-size:30px;color:#7a6a50;font-weight:700">${T("s12_book")}</div>`,
     { left: (W - 520) / 2 + "px", top: (H - 640) / 2 + "px" });
   bk.style.transformOrigin = "center bottom";
   setTimeout(() => { bk.style.transition = "transform .9s cubic-bezier(.5,0,.8,.4), opacity .9s";
@@ -554,7 +664,7 @@ const SC = {
     "sm haldi", 5.0, null,
     { left: "50%", top: fmt==="9x16" ? "68%" : "70%",
       transform: "translateX(-50%)" });
-  sup("departed-asparagus-catalog.ngrok-free.dev", "sm teal", 5.8, null,
+  sup("bolo-khata.onrender.com", "sm teal", 5.8, null,
     { left: "50%", top: fmt==="9x16" ? "75%" : "78%",
       transform: "translateX(-50%)" });
   sup("Narration: Gnani Timbre", "sm ink", 6.4, null,
@@ -568,9 +678,13 @@ const SC = {
 const n = parseInt(P.get("scene") || "1", 10);
 paperBase && 0;
 SC[n]();
-/* signal done a beat after the scene's last scheduled beat */
+/* signal done a beat after the scene's last scheduled beat.
+   TE narration runs longer — stretch scene tails so VO doesn't
+   overlap the next narrator line (visuals just linger). */
 const DUR = { 1: 4.6, 2: 2.6, 3: 13.5, 4: 7.0, 5: 7.4, 6: 7.4, 7: 6.6,
   8: 6.4, 9: 8.8, 10: 6.0, 11: 7.2, 12: 7.6 };
+const DUR_TE = { 1: 7.8, 3: 14.4, 4: 7.6, 6: 7.0, 12: 10.6 };
+if (lang === "te") Object.assign(DUR, DUR_TE);
 setTimeout(() => { window.__done = true; }, (DUR[n] || 8) * 1000);
 </script>
 </body>

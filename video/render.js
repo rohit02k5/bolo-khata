@@ -12,6 +12,9 @@ const OUT = ROOT + "\\out";
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
 const DUR = { 1: 4.6, 2: 2.6, 3: 13.5, 4: 7.0, 5: 7.4, 6: 7.4, 7: 6.6,
   8: 6.4, 9: 8.8, 10: 6.0, 11: 7.2, 12: 7.6 };
+const DUR_TE = { 1: 7.8, 3: 14.4, 4: 7.6, 6: 7.0, 12: 10.6 };
+const LANG = process.argv[3] || "hi";
+if (LANG === "te") Object.assign(DUR, DUR_TE);
 const MIME = { ".html": "text/html", ".webm": "video/webm",
   ".wav": "audio/wav", ".mp4": "video/mp4", ".json": "application/json" };
 
@@ -53,7 +56,8 @@ async function maskPng(b, w, h, r) {
 
   for (const n of Object.keys(DUR).map(Number)) {
     for (const fmt of ["16x9", "9x16"]) {
-      const tag = `seg-${String(n).padStart(2, "0")}-${fmt}`;
+      const tag = `seg-${String(n).padStart(2, "0")}` +
+        (LANG === "hi" ? "" : `-${LANG}`) + `-${fmt}`;
       if (only && !only.includes(String(n)) && !only.includes(tag))
         continue;
       const dims = fmt === "9x16" ? { width: 1080, height: 1920 }
@@ -62,7 +66,7 @@ async function maskPng(b, w, h, r) {
         recordVideo: { dir: OUT, size: dims } });
       const p = await c.newPage();
       await p.goto(
-        `http://localhost:${port}/motion/player.html?scene=${n}&fmt=${fmt}`);
+        `http://localhost:${port}/motion/player.html?scene=${n}&fmt=${fmt}&lang=${LANG}`);
       const deadline = (DUR[n] + 4) * 1000;
       try {
         await p.waitForFunction(() => window.__done === true, null,

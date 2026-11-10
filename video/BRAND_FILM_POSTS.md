@@ -3,6 +3,14 @@
 Nominated contest post stays the honest 60-second demo — this film is the
 second/pinned post.
 
+## Files (`video/out/`)
+- `brand-{90s,45s,15s}-{16x9,9x16}.mp4` — Hinglish version
+- `brand-{90s,45s,15s}-en-{16x9,9x16}.mp4` — English version (Timbre Kaveri)
+- `brand-{90s,45s,15s}-te-{16x9,9x16}.mp4` — Telugu version (Timbre Suhana)
+- `thumbnail.png` (1280×720), `cover-square.png` (1080×1080)
+- `captions/{hi,en,te}.srt`
+- Try it live: https://bolo-khata.onrender.com
+
 ## X (Twitter)
 ```
 Bolo. Khata likh gaya. 🎙️📒

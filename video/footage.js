@@ -8,11 +8,13 @@ const { chromium } =
   require("D:/Gnani/shot/node_modules/playwright-core");
 const fs = require("fs");
 
-const BASE = "https://departed-asparagus-catalog.ngrok-free.dev";
+const BASE = process.env.FILM_BASE ||
+  "https://bolo-khata.onrender.com";
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
 const OUT = "D:/Gnani/bolo-khata/video/footage";
 const VOICE = "D:/Gnani/shot/voice";
-const STATE = "D:/Gnani/shot/film-state.json";
+const STATE = process.env.FILM_STATE ||
+  "D:/Gnani/shot/film-state-prod.json";
 
 const env = {};
 fs.readFileSync("D:/Gnani/bolo-khata/backend/.env", "utf8")
@@ -28,11 +30,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let scene = "";
 
 async function login() {
-  return fetch(BASE + "/api/login", {
+  const r = await fetch(BASE + "/api/session/login", {
     method: "POST", headers: APIH,
     body: JSON.stringify({ email: env.OWNER_EMAIL,
       password: env.OWNER_PASSWORD }),
-  }).then((r) => r.json());
+  });
+  return r.json();
 }
 async function api(tok, method, path, body) {
   const hdrs = { ...APIH };
@@ -93,6 +96,21 @@ async function appReady(page) {
   await sleep(1600);
 }
 
+/* If the khata button is disabled (STT dropped the customer name),
+   attach the customer via the real "Customer badlo" picker — a shipped
+   interaction, not a test hook. */
+async function ensureCustomer(p, name) {
+  const khata = p.locator('button:has-text("Khata me likho")');
+  if (await khata.count() && await khata.first().isEnabled()
+      .catch(() => false)) return;
+  await click(p, '.who button.link, button.link:has-text("Customer badlo"),'
+    + ' button.link:has-text("Change customer")');
+  await p.waitForSelector('[role="dialog"][aria-label="customer"]',
+    { timeout: 15000 });
+  await click(p, `.pick-row:has-text("${name}")`);
+  await sleep(1200);
+}
+
 /* ---------- hero voice turn -> bill -> khata -> stamp ----------- */
 async function f_hero() {
   scene = "hero";
@@ -105,6 +123,7 @@ async function f_hero() {
   await p.waitForSelector('[role="dialog"][aria-label="bill"]',
     { timeout: 50000 });
   await sleep(2500);
+  await ensureCustomer(p, "Ramesh");
   await click(p, 'text=Khata me likho');
   await sleep(3000);
   await sleep(2000);
@@ -157,6 +176,7 @@ async function f_askback() {
   await sleep(400);
   await click(p, '.ask-card button.primary');
   await sleep(1800);
+  await ensureCustomer(p, "Suresh");
   await click(p, 'text=Khata me likho');
   await sleep(3000);
   await settle(c); await b.close();
