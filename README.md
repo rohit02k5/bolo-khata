@@ -4,6 +4,10 @@ A shopkeeper speaks in Hinglish or Telugu — even in a noisy shop — and
 bills, stock and khata update, with trust built in through two-sided
 customer confirmation.
 
+**Live: https://bolo-khata.onrender.com** — free tier sleeps after ~15
+min idle; first hit takes ~30–60 s to wake. Full feature list:
+`FEATURES.md`.
+
 **Gnani models used (load-bearing):**
 
 | Stage | Model | Why it matters |
@@ -88,12 +92,15 @@ cd frontend && npm install && npm run build && npx next start -p 3000
 # open http://localhost:3000 (API calls go to :8000)
 ```
 
-## Public URL (dev)
+## Public URL
 
-Single ngrok tunnel → `http://localhost:8000`; FastAPI proxies page
-traffic to the Next server, so **one HTTPS URL serves UI + API + WSS**.
-Start: `ngrok http 8000`. (Production deploy: Vercel frontend + always-on
-backend — see PLAN.md.)
+**Production: `https://bolo-khata.onrender.com`** — one Render Docker
+service (repo-root `Dockerfile`): Next `next start` + FastAPI in one
+container, backend proxies page traffic, so one URL serves UI + API +
+WSS. Free tier sleeps when idle — see `DEPLOY.md`.
+
+For local dev sharing: single ngrok tunnel → `http://localhost:8000`;
+FastAPI proxies page traffic the same way. Start: `ngrok http 8000`.
 
 ## Fallback (labeled)
 

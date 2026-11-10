@@ -1,36 +1,43 @@
 # Deploy — always-on (no cold starts during the demo)
 
-## CURRENT LIVE URL (verified 2026-11-09)
+## CURRENT LIVE URL (verified 2026-11-10)
 
-**`https://departed-asparagus-catalog.ngrok-free.dev`** — single ngrok
-tunnel → local FastAPI (:8000) which proxies the Next production build.
-Full journey suite (44 Playwright checks, fresh profiles, mobile
-viewport, real recorded audio through the mic path) is **all green**
-on this URL. Lives only while the laptop + tunnel are up — restart
-with `ngrok http 8000` after sleep/shutdown.
+**`https://bolo-khata.onrender.com`** — single Render web service
+(`srv-dbp9airm8hqs73d88l2g`, region `oregon`) built from the repo-root
+`Dockerfile`: Next.js `next start` on :3000 + FastAPI `uvicorn` on the
+Render `$PORT`, with the backend proxying all page traffic to the
+frontend — so ONE public URL serves the whole app.
 
-Vercel/Render are still the target deploy (steps below). Status:
-- **Vercel**: the supplied `vck_…` key is a Vercel **AI-Gateway** key —
-  project creation returns 403. Needs a full-scope token (vercel.com →
-  Settings → Tokens) or `vercel login` interactively.
-- **Render**: API key works, but repo deploys require the Render
-  GitHub integration (one OAuth click — connect
-  `rohit02k5/bolo-khata` at render.com → Account → GitHub). No Docker
-  daemon on this box and no `write:packages` scope, so a prebuilt GHCR
-  image path is also blocked.
-- Demo owner password rotated to a strong random value — stored only
-  in `backend/.env` (gitignored) and should be set as `OWNER_PASSWORD`
-  on the hosts' secret stores. Not printed anywhere.
-- `/try` and `/api/command` are rate-limited (per-IP daily cap,
-  `backend/app/ratelimit.py`) — safe to leave open for judges.
-- Security headers are live (nosniff, DENY framing, Referrer-Policy,
-  mic/camera Permissions-Policy) — verified through the tunnel.
+Verified on the live URL:
+- `/healthz` → `{"ok":true,"mock_gnani":false}` — **real Gnani**, not mock
+- `/` and `/try` → 200 through the built-in proxy
+- Owner signup → `/api/shop/setup` (kirana starter catalog) → login OK
+- `/api/command` → `"2 kilo cheeni 1 maggi"` parses to a real ₹104
+  proposal on the deployed service
+- `POST /api/tts` → real Timbre WAV (~61 KB)
+- `GET /ws/stt` → `101 Switching Protocols` — the Prisma WS relay
+  upgrades fine on Render
 
-Architecture in prod is two URLs (this is fine — no proxy needed):
+Environment set on the service (values live in Render's dashboard /
+`backend/.env`, never in git): `GNANI_API_KEY`, `OWNER_EMAIL`,
+`OWNER_PASSWORD`, `SESSION_SECRET`, `SHOP_NAME`, `SHOP_VPA`,
+`FRONTEND_ORIGIN=http://localhost:3000` (internal Next server),
+`CORS_ORIGINS=*`, `STT_MODEL`, `TTS_MODEL`.
 
-- **Frontend** → Vercel (free, Next.js native)
-- **Backend** → Render `starter` ($7/mo, always-on) **or** Railway (~$5/mo)
-  — the WebSocket relay needs a real process, not serverless.
+### Free-tier caveats (plan = `free`)
+
+- **Sleeps after ~15 min idle** → first request takes ~30–60 s to wake.
+  Before a demo, hit `/healthz` once to warm it, or attach a free
+  UptimeRobot monitor pinging `/healthz` every 5 min. Upgrade to
+  `starter` ($7/mo) for always-on.
+- **SQLite is on ephemeral disk** → redeploys/restarts reseed the demo
+  shop (fresh signups needed). Intentional for the demo; document as
+  a limitation.
+
+Old ngrok URL (`departed-asparagus-catalog.ngrok-free.dev`) is dead —
+it lived only while the laptop + tunnel were up.
+
+Prior notes retained below (Vercel fallback, Railway option, blueprint):
 
 ## Option A — Render (recommended, blueprint included)
 
