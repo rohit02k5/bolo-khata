@@ -82,6 +82,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { height: 100%; -webkit-text-size-adjust: 100%; }
+html { -webkit-tap-highlight-color: transparent; }
 body {
   height: 100%;
   background: var(--bg); color: var(--ink);
@@ -360,7 +361,7 @@ details.debug summary::-webkit-details-marker { display: none; }
   padding: 8px 20px calc(18px + env(safe-area-inset-bottom));
   box-shadow: var(--e3);
   animation: sheet-up .34s var(--ease);
-  max-height: 88vh; overflow-y: auto;
+  max-height: 88vh; max-height: 92dvh; overflow-y: auto;
 }
 @keyframes sheet-up { from { transform: translate(-50%, 100%); } }
 .grab {
@@ -893,7 +894,7 @@ button.tonal { background: var(--s2); color: var(--ink); font-weight: 700;
   10px; scrollbar-width: none; }
 .chip-row::-webkit-scrollbar { display: none; }
 .chip {
-  flex-shrink: 0; padding: 8px 14px; border-radius: 999px;
+  flex-shrink: 0; padding: 10px 16px; border-radius: 999px;
   background: var(--s2); color: var(--ink2); font-weight: 600;
   font-size: 13.5px; border: none; cursor: pointer;
   transition: background .15s, color .15s;

@@ -253,11 +253,11 @@ export default function Onboarding() {
             <input value={newItem.name} aria-label="new item name"
               onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
               placeholder={pick(lang, S.addItem)}
-              style={{ flex: 1, minWidth: 0, fontSize: 15,
+              style={{ flex: 1, minWidth: 0, fontSize: 16,
                 minHeight: 46, padding: "0 14px" }} />
             <input value={newItem.price} inputMode="decimal"
               aria-label="new item price"
-              style={{ width: 70, minHeight: 46, fontSize: 15,
+              style={{ width: 70, minHeight: 46, fontSize: 16,
                 padding: "0 10px", textAlign: "right" }}
               placeholder={pick(lang, S.price)}
               onChange={(e) => setNewItem({ ...newItem, price: e.target.value })} />

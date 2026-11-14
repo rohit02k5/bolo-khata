@@ -1678,6 +1678,8 @@ function StockPanel({ role, t }: any) {
           </span>
         </span>
         <b>{p.stock} {p.unit}</b>
+        {onTap && <span className="dim" aria-hidden="true"
+          style={{ fontSize: 20, marginLeft: -4 }}>›</span>}
       </div>);
   }
 
@@ -1735,6 +1737,8 @@ function StockPanel({ role, t }: any) {
                     <b>{inr(p.price_paise)}</b>
                     <span className={"bal " + (low(p) ? "due" : "paid")}>
                       {p.stock} {p.unit}</span>
+                    {role === "owner" &&
+                      <span className="dim" aria-hidden="true">›</span>}
                   </span>
                 </div>))}
             </div>
