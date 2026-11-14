@@ -56,6 +56,19 @@ const S = {
 
 const UNITS = ["piece", "kg", "g", "liter", "ml", "packet", "dozen"];
 
+// req() throws `Error("<status> <body>")` — pull the server's detail out
+function apiErr(e: any): string {
+  const msg = String(e?.message || "");
+  const i = msg.indexOf("{");
+  if (i >= 0) {
+    try {
+      const d = JSON.parse(msg.slice(i)).detail;
+      if (typeof d === "string") return d;
+    } catch {}
+  }
+  return "";
+}
+
 export default function Onboarding() {
   const router = useRouter();
   const [lang] = useLang();
@@ -83,18 +96,30 @@ export default function Onboarding() {
   async function createShop() {
     setBusy(true); setErr("");
     try {
-      const r = await api.shopSetup({
-        name: shopName, business_type: btype, vpa, city, starter: true });
-      // the setup call returns a shop-bound token — switch to it
-      setToken(r.token); localStorage.setItem("bk_token", r.token);
-      setJoinCode(r.join_code);
+      let joinCode = "";
+      try {
+        const r = await api.shopSetup({
+          name: shopName, business_type: btype, vpa, city, starter: true });
+        // the setup call returns a shop-bound token — switch to it
+        setToken(r.token); localStorage.setItem("bk_token", r.token);
+        joinCode = r.join_code;
+      } catch (e: any) {
+        // shop already exists (e.g. retry / demo owner) — continue to
+        // the rate list instead of dead-ending on the error banner
+        if (!String(e?.message || "").startsWith("409")) throw e;
+        try { joinCode = (await api.shop()).join_code || ""; } catch {}
+      }
+      setJoinCode(joinCode);
       const cat = await api.catalog();
       setProducts(cat.products);
-      const link = `${window.location.origin}/join/${r.join_code}`;
-      setQr(await QRCode.toDataURL(link, { width: 220, margin: 1 }));
+      if (joinCode) {
+        const link = `${window.location.origin}/join/${joinCode}`;
+        setQr(await QRCode.toDataURL(link, { width: 220, margin: 1 }));
+      }
       setStep(3);
-    } catch { setErr(pick(lang, S.err)); }
-    finally { setBusy(false); }
+    } catch (e: any) {
+      setErr(apiErr(e) || pick(lang, S.err));
+    } finally { setBusy(false); }
   }
 
   async function updatePrice(p: any, rupees: string) {
