@@ -199,15 +199,21 @@ def edit_bill(items: list[dict], db, *, customer_id: int | None = None,
 
 
 # ----------------------------------------------------------- extra intents
-_RESTOCK_HINTS = ("next time", "agli baar", "list mein", "list me",
-                  "checklist", "note kar", "note kar lo", "yaad rakh",
-                  "mangwana", "order karna", "లిస్ట్", "ఆర్డర్")
+_RESTOCK_HINTS = ("next time", "next week", "next month", "agli baar",
+                  "list mein", "list me", "checklist", "note kar",
+                  "note kar lo", "yaad rakh", "mangwana", "mangwani",
+                  "mangwana hai", "order karna", "order karni",
+                  "order karwana", "order karwani", "order",
+                  "hafte baad", "hafta baad", "week baad", "din baad",
+                  "parso", "aane wali", "aayegi", "aana hai",
+                  "లిస్ట్", "ఆర్డర్")
 _VOICE_NOTE_HINTS = ("yaad dilao", "yaad dilana", "yaad dila", "remind karo",
                      "reminder bhejo", "reminder bhej", "యాదు చేయి",
                      "గుర్తు చేయి")
 _STOCK_OUT_HINTS = ("kharab", "nikala", "nikaal", "nikal diya", "damage",
                     "expired", "expire", "ghatao", "kam kar do",
-                    "stock kam", "फट गया", "खराब", "చెడిపోయిన")
+                    "stock kam", "khatam", "samapt", "फट गया", "खराब",
+                    "చెడిపోయిన")
 _SUMMARY_HINTS = ("aaj ka hisaab", "aaj ka hisab", "aaj ki sale",
                   "aaj kitna", "aaj ka sale", "today sale", "hisaab batao",
                   "hisab batao", "ఈరోజు")
@@ -215,9 +221,14 @@ _WEEKLY_HINTS = ("is hafte", "hafte ka hisaab", "hafte mein", "weekly",
                  "is week", "saat din", "ఈ వారం", "వారం హిసాబ్")
 _HINT_WORDS = {"next", "time", "agli", "baar", "list", "mein", "me",
                "checklist", "note", "kar", "lo", "yaad", "rakh",
-               "mangwana", "hai", "order", "karna", "dilao", "dilana",
-               "dila", "remind", "karo", "reminder", "bhejo", "bhej",
-               "kharab", "ho", "gayi", "gaya"}
+               "mangwana", "mangwani", "hai", "order", "karna", "karni",
+               "karwana", "karwani", "dilao", "dilana", "dila", "remind",
+               "karo", "reminder", "bhejo", "bhej", "kharab", "ho",
+               "gayi", "gaya", "week", "hafte", "hafta", "din", "baad",
+               "month", "mahina", "parso", "aane", "aana", "wali",
+               "aayegi", "ki", "ke", "ka", "ko", "se", "tak",
+               "mujhe", "mujhko", "hamko", "hame", "hum", "main",
+               "mera", "meri", "mere", "me", "mein", "me"}
 
 
 def _non_hint_items(canon: str):
@@ -662,6 +673,19 @@ def confirm(proposal_id: str, accept: bool, db, *,
     if entry["kind"] == "reminder":
         p = entry["obj"]
         rid = db.add_reminder(p["kind"], p, customer_id=p.get("customer_id"))
+        # a confirmed restock is goods arriving — add it to stock too
+        if p.get("kind") == "restock":
+            for i in p.get("items") or []:
+                if i.get("product_id") and i.get("qty"):
+                    try:
+                        db.adjust_stock(
+                            i["product_id"], float(i["qty"]),
+                            unit=i.get("unit") or "piece",
+                            note="restock", transcript=entry["transcript"],
+                            idempotency_key=(
+                                f"restock:{rid}:{i['product_id']}"))
+                    except Exception:  # noqa: BLE001
+                        pass
         out = {"ok": True, "written": True, "reminder_id": rid,
                "spoken": speak_text.done(lang)}
         if p["kind"] == "voice_note":

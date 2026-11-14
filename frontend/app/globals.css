@@ -861,3 +861,46 @@ button.tonal { background: var(--s2); color: var(--ink); font-weight: 700;
     --haldi: #e0a52e; --haldi-soft: #2e2617; --kumkum: #e06368;
   }
 }
+
+/* ---------- oauth buttons ---------- */
+.oauth-row { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.oauth-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 48px; border-radius: 14px; font-weight: 700; font-size: 15px;
+  background: var(--s1); color: var(--ink); border: 1px solid var(--line);
+  box-shadow: var(--e1); text-decoration: none; cursor: pointer;
+  transition: transform .15s var(--ease), opacity .15s;
+}
+.oauth-btn:active { transform: scale(.98); }
+.oauth-btn.off { opacity: .45; cursor: not-allowed; }
+.oauth-or { display: flex; align-items: center; gap: 12px;
+  color: var(--dim); font-size: 12.5px; width: 100%; }
+.oauth-or::before, .oauth-or::after { content: ""; flex: 1;
+  height: 1px; background: var(--line); }
+.oauth-note { color: var(--dim); font-size: 12.5px; text-align: center; }
+
+/* ---------- selectable list rows (delete mode) ---------- */
+.selbox {
+  min-width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+  border: 2px solid var(--line); display: inline-grid;
+  place-items: center; color: #fff;
+}
+.selbox.on { background: var(--bad); border-color: var(--bad); }
+.entry.sel { background: var(--bad-soft); border-radius: 10px; }
+
+/* ---------- category chips (stock browse) ---------- */
+.chip-row { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px
+  10px; scrollbar-width: none; }
+.chip-row::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0; padding: 8px 14px; border-radius: 999px;
+  background: var(--s2); color: var(--ink2); font-weight: 600;
+  font-size: 13.5px; border: none; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.chip.sel { background: var(--primary); color: var(--primary-ink); }
+
+.qty-input {
+  width: 76px; min-height: 48px; text-align: center; font-weight: 800;
+  font-size: 18px; padding: 0 8px;
+}

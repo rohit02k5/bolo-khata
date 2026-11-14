@@ -67,6 +67,8 @@ export default function Onboarding() {
   const [vpa, setVpa] = useState("");
   const [products, setProducts] = useState<any[]>([]);
   const [newItem, setNewItem] = useState({ name: "", price: "", unit: "piece" });
+  const [delMode, setDelMode] = useState(false);
+  const [delSel, setDelSel] = useState<Set<number>>(new Set());
   const [qr, setQr] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [err, setErr] = useState("");
@@ -114,6 +116,25 @@ export default function Onboarding() {
       setProducts([...products, r.product]);
       setNewItem({ name: "", price: "", unit: "piece" });
     } catch { setErr(pick(lang, S.err)); }
+  }
+
+  function toggleDel(id: number) {
+    setDelSel((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  async function deleteSelected() {
+    const ids = [...delSel];
+    setBusy(true);
+    try {
+      await Promise.all(ids.map((id) => api.deleteProduct(id)
+        .catch(() => {})));
+      setProducts(products.filter((p) => !delSel.has(p.id)));
+      setDelSel(new Set()); setDelMode(false);
+    } finally { setBusy(false); }
   }
 
   const phrases = pick(lang, {
@@ -202,16 +223,26 @@ export default function Onboarding() {
             padding: "4px 14px" }}>
             <div className="list">
               {products.map((p) => (
-                <div className="entry" key={p.id}>
+                <div className={"entry" + (delSel.has(p.id) ? " sel" : "")}
+                  key={p.id}
+                  role={delMode ? "button" : undefined}
+                  aria-pressed={delMode ? delSel.has(p.id) : undefined}
+                  onClick={delMode ? () => toggleDel(p.id) : undefined}
+                  style={delMode ? { cursor: "pointer" } : undefined}>
+                  {delMode && (
+                    <span className={"selbox" +
+                      (delSel.has(p.id) ? " on" : "")} aria-hidden="true">
+                      {delSel.has(p.id) && <CheckIcon size={15} />}</span>)}
                   <span style={{ fontWeight: 600 }}>{p.name_en}
                     <span className="dim"> · {p.unit}</span></span>
+                  {!delMode && (
                   <span className="row" style={{ gap: 6 }}>
                     <span className="dim">₹</span>
                     <input inputMode="decimal" aria-label={`price ${p.name_en}`}
                       style={{ width: 74, textAlign: "right", minHeight: 40 }}
                       defaultValue={(p.price_paise / 100).toString()}
                       onBlur={(e) => updatePrice(p, e.target.value)} />
-                  </span>
+                  </span>)}
                 </div>
               ))}
               {!products.length && <div className="empty-state">
@@ -221,18 +252,40 @@ export default function Onboarding() {
           <div className="row" style={{ width: "100%", gap: 8 }}>
             <input value={newItem.name} aria-label="new item name"
               onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-              placeholder={pick(lang, S.addItem)} style={{ flex: 1 }} />
+              placeholder={pick(lang, S.addItem)}
+              style={{ flex: 1, minWidth: 0, fontSize: 15,
+                minHeight: 46, padding: "0 14px" }} />
             <input value={newItem.price} inputMode="decimal"
-              aria-label="new item price" style={{ width: 76 }}
+              aria-label="new item price"
+              style={{ width: 70, minHeight: 46, fontSize: 15,
+                padding: "0 10px", textAlign: "right" }}
               placeholder={pick(lang, S.price)}
               onChange={(e) => setNewItem({ ...newItem, price: e.target.value })} />
             <select value={newItem.unit} aria-label="new item unit"
-              onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}>
+              onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+              style={{ width: 92, minHeight: 46, fontSize: 14,
+                padding: "0 6px" }}>
               {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
             </select>
             <button className="tonal" onClick={addNewItem}
               aria-label="add item">+</button>
+            {delMode ? (
+              <button className="danger" disabled={!delSel.size || busy}
+                onClick={deleteSelected}
+                aria-label="delete selected">
+                {delSel.size ? `Delete (${delSel.size})` : "Delete"}</button>
+            ) : (
+              <button className="tonal" onClick={() => {
+                setDelMode(true); setDelSel(new Set());
+              }} aria-label="delete items">🗑</button>
+            )}
           </div>
+          {delMode && (
+            <div className="caption" style={{ marginTop: -8 }}>
+              {pick(lang, { hi: "item chuno, phir Delete dabao",
+                te: "వస్తువులు ఎంచుకుని Delete నొక్కండి",
+                en: "tap items to select, then press Delete" })}
+            </div>)}
           <div className="row" style={{ justifyContent: "space-between",
             width: "100%" }}>
             <span />

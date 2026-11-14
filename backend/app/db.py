@@ -271,6 +271,16 @@ class ShopDB:
         self.conn.commit()
         return cur.lastrowid
 
+    def create_oauth_user(self, email: str, name: str = "") -> int:
+        """OAuth-only account — no usable password hash on purpose."""
+        cur = self.conn.execute(
+            "INSERT INTO users (email,name,pass_hash,salt,role,created) "
+            "VALUES (?,?,?,?,?,?)",
+            (email.strip().lower()[:120], name.strip()[:60],
+             "!oauth-only", "!", "owner", time.time()))
+        self.conn.commit()
+        return cur.lastrowid
+
     def user_by_email(self, email: str) -> sqlite3.Row | None:
         return self.conn.execute(
             "SELECT * FROM users WHERE email=?",
@@ -363,6 +373,13 @@ class ShopDB:
                 (*args, product_id))
             self.conn.commit()
         return True
+
+    def delete_product(self, product_id: int) -> bool:
+        cur = self.conn.execute(
+            "DELETE FROM products WHERE id=? AND shop_id=?",
+            (product_id, self.shop_id))
+        self.conn.commit()
+        return cur.rowcount > 0
 
     # ---------------------------------------------------- bolta-compatible
     def products(self) -> list[sqlite3.Row]:

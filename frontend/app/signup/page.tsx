@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, setToken } from "../lib/api";
+import { OAuthButtons } from "../lib/oauth";
 import { LANG_OPTIONS, pick, useLang } from "../lib/i18n";
 import { StoreIcon, UserIcon } from "../lib/icons";
 
@@ -142,6 +143,7 @@ export default function Signup() {
           <button className="primary big" disabled={busy}
             onClick={role === "owner" ? doOwner : doCustomer}>
             {pick(lang, S.next)}</button>
+          {role === "owner" && <OAuthButtons next="/signup" />}
         </div>
         <div className="caption" style={{ marginTop: 8 }}>
           {pick(lang, S.have)}{" "}

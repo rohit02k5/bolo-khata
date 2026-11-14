@@ -106,6 +106,8 @@ export const api = {
     req(`/api/products/${id}`, {
       method: "PATCH", body: JSON.stringify(p),
     }),
+  deleteProduct: (id: number) =>
+    req(`/api/products/${id}`, { method: "DELETE" }),
   addCustomer: (name: string, phone = "", lang_pref = "hinglish") =>
     req("/api/customers", {
       method: "POST",

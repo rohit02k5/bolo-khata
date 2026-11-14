@@ -68,6 +68,9 @@ const T: Record<string, Record<string, string>> = {
     remove: "Hata do",
     pricePh: "daam ₹", itemPh: "item", qtyAsk: "Kitna?",
     create: "Banao",
+    editItem: "Item edit karo", itemName: "naam", unitLbl: "unit",
+    stockLbl: "stock", saveLbl: "Save", deleteLbl: "Delete",
+    delSure: "Haan, delete karo", delNo: "Nahi",
     addItem: "+ Item jodein",
     changeCust: "Customer badlo",
     changeType: "Business type badlo",
@@ -128,6 +131,9 @@ const T: Record<string, Record<string, string>> = {
     remove: "తీసేయండి",
     pricePh: "ధర ₹", itemPh: "వస్తువు", qtyAsk: "ఎంత?",
     create: "చేయండి",
+    editItem: "వస్తువు సవరణ", itemName: "పేరు", unitLbl: "యూనిట్",
+    stockLbl: "స్టాక్", saveLbl: "సేవ్", deleteLbl: "తొలగించు",
+    delSure: "అవును, తొలగించు", delNo: "వద్దు",
     addItem: "+ వస్తువు చేర్చండి",
     changeCust: "కస్టమర్ మార్చండి",
     changeType: "బిజినెస్ రకం మార్చండి",
@@ -188,6 +194,9 @@ const T: Record<string, Record<string, string>> = {
     remove: "Remove",
     pricePh: "price ₹", itemPh: "item", qtyAsk: "How much?",
     create: "Create",
+    editItem: "Edit item", itemName: "name", unitLbl: "unit",
+    stockLbl: "stock", saveLbl: "Save", deleteLbl: "Delete",
+    delSure: "Yes, delete it", delNo: "No",
     addItem: "+ Add item",
     changeCust: "Change customer",
     changeType: "Change business type",
@@ -775,7 +784,7 @@ export default function Home() {
 
       {tab === "ledger" && ledger && <LedgerPanel ledger={ledger}
         summary={summary} t={t} />}
-      {tab === "stock" && ledger && <StockPanel />}
+      {tab === "stock" && ledger && <StockPanel role={role} t={t} />}
       {tab === "list" && <RemindersPanel t={t} />}
       {tab === "shop" && (<>
         <ShopPanel t={t} btype={btype}
@@ -1172,6 +1181,12 @@ function LineEditSheet({ idx, item, catalog, role, t, onClose, onChange,
     onChange({ ...item, qty,
       line_total_paise: Math.round(qty * (item.unit_price_paise || 0)) });
   };
+  const setQtyExact = (raw: string) => {
+    const qty = parseFloat(raw);
+    if (isNaN(qty) || qty <= 0) return;
+    onChange({ ...item, qty,
+      line_total_paise: Math.round(qty * (item.unit_price_paise || 0)) });
+  };
   return (<>
     <div className="sheet-back" style={{ zIndex: 64 }}
       onClick={onClose} />
@@ -1187,7 +1202,11 @@ function LineEditSheet({ idx, item, catalog, role, t, onClose, onChange,
         alignItems: "center" }}>
         <button className="stepper" aria-label="less"
           onClick={() => setQty(-1)}>−</button>
-        <b className="qty-big">{item.qty}</b>
+        <input className="qty-input" inputMode="decimal"
+          defaultValue={item.qty} aria-label="quantity"
+          onBlur={(e) => setQtyExact(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter")
+            (e.target as HTMLInputElement).blur(); }} />
         <button className="stepper" aria-label="more"
           onClick={() => setQty(1)}>+</button>
         <select value={item.unit} aria-label="unit"
@@ -1585,36 +1604,98 @@ function WeeklyCard({ t }: any) {
   );
 }
 
-function StockPanel() {
+/* coarse catalog grouping — keyword match on name + aliases, so
+   "Basmati Chawal"-style variants land under the same chip as "Chawal" */
+const GROUP_RULES: [string, string[]][] = [
+  ["Rice, Atta & Flour",
+    ["chawal", "chaval", "rice", "basmati", "atta", "aata", "gehu",
+     "flour", "besan", "suji", "poha"]],
+  ["Daal & Masala",
+    ["daal", "dal", "arhar", "masala", "haldi", "mirchi", "dhania",
+     "jeera", "spice"]],
+  ["Sugar & Salt",
+    ["chini", "cheeni", "sugar", "namak", "salt", "sendha"]],
+  ["Oil & Ghee",
+    ["tel", "oil", "ghee", "neyyi", "vanaspati", "dalda", "refined"]],
+  ["Dairy",
+    ["doodh", "milk", "dahi", "curd", "paneer", "butter", "amul"]],
+  ["Snacks & Instant",
+    ["maggi", "noodle", "namkeen", "bhujia", "kurkure", "chips", "lays",
+     "parle", "biscuit", "bisket", "snack", "pizza"]],
+  ["Tea & Drinks",
+    ["chai", "tea", "coffee", "nescafe", "frooti", "drink", "juice",
+     "squash"]],
+  ["Personal Care",
+    ["sabun", "soap", "shampoo", "toothpaste", "paste", "cream",
+     "dettol", "lifebuoy"]],
+];
+
+function groupOf(p: any): string {
+  const hay = `${p.name_en || ""} ${p.aliases || ""}`.toLowerCase();
+  for (const [g, kws] of GROUP_RULES)
+    if (kws.some((k) => hay.includes(k))) return g;
+  return "Others";
+}
+
+function StockPanel({ role, t }: any) {
   const [cat, setCat] = useState<any>(null);
   const [reo, setReo] = useState<any[]>([]);
-  useEffect(() => {
+  const [grp, setGrp] = useState("");          // "" = show all
+  const [edit, setEdit] = useState<any>(null); // product open in editor
+  const load = () => {
     api.catalog().then(setCat).catch(() => {});
     api.reorder().then((r) => setReo(r.suggestions)).catch(() => {});
-  }, []);
+  };
+  useEffect(load, []);
   if (!cat) return <div className="empty-state">…</div>;
   const low = (p: any) => p.stock <= (p.reorder_point || 0);
+  const counts = new Map<string, number>();
+  for (const p of cat.products) {
+    const g = groupOf(p);
+    counts.set(g, (counts.get(g) || 0) + 1);
+  }
+  const chips = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const shown = grp ? cat.products.filter((p: any) => groupOf(p) === grp)
+                    : cat.products;
+
+  function StockRow({ p, onTap }: any) {
+    return (
+      <div className="entry" role={onTap ? "button" : undefined}
+        style={onTap ? { cursor: "pointer" } : undefined}
+        onClick={onTap}>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span className="row">
+            <span>{icon(p.name_en)} {p.name_en}</span>
+            {low(p) && <span className="pill disputed">low</span>}
+          </span>
+          <span className="dim" style={{ fontSize: 13 }}>
+            {inr(p.price_paise)}/{p.unit}</span>
+          <span className="stockbar" aria-hidden="true">
+            <i style={{ width:
+              `${Math.min(100, (p.stock / Math.max(1,
+                (p.reorder_point || 10) * 3)) * 100)}%`,
+              background: low(p) ? "var(--bad)" : "var(--ok)" }} />
+          </span>
+        </span>
+        <b>{p.stock} {p.unit}</b>
+      </div>);
+  }
+
   return (
     <>
       <div className="section-head" style={{ marginTop: 8 }}>Stock</div>
+      <div className="chip-row" role="tablist" aria-label="categories">
+        <button className={"chip" + (!grp ? " sel" : "")}
+          onClick={() => setGrp("")}>Sab</button>
+        {chips.map(([g, n]) => (
+          <button key={g} className={"chip" + (grp === g ? " sel" : "")}
+            onClick={() => setGrp(g)}>{g} · {n}</button>))}
+      </div>
       <div className="surface" style={{ padding: "4px 16px" }}>
         <div className="list">
-          {cat.products.map((p: any) => (
-            <div className="entry" key={p.id}>
-              <span style={{ minWidth: 0, flex: 1 }}>
-                <span className="row">
-                  <span>{icon(p.name_en)} {p.name_en}</span>
-                  {low(p) && <span className="pill disputed">low</span>}
-                </span>
-                <span className="stockbar" aria-hidden="true">
-                  <i style={{ width:
-                    `${Math.min(100, (p.stock / Math.max(1,
-                      (p.reorder_point || 10) * 3)) * 100)}%`,
-                    background: low(p) ? "var(--bad)" : "var(--ok)" }} />
-                </span>
-              </span>
-              <b>{p.stock} {p.unit}</b>
-            </div>))}
+          {shown.map((p: any) => (
+            <StockRow key={p.id} p={p}
+              onTap={role === "owner" ? () => setEdit(p) : undefined} />))}
         </div>
       </div>
       {!!reo.length && (<>
@@ -1630,8 +1711,115 @@ function StockPanel() {
           </div>
         </div>
       </>)}
+
+      {/* category window — every variant in the group, with prices */}
+      {grp && (
+        <>
+          <div className="sheet-back" style={{ zIndex: 60 }}
+            onClick={() => setGrp("")} />
+          <div className="sheet" role="dialog"
+            aria-label={`${grp} items`} style={{ zIndex: 61,
+            maxHeight: "70vh", overflowY: "auto" }}>
+            <div className="grab" aria-hidden="true" />
+            <b style={{ fontSize: 18 }}>{grp}</b>
+            <div className="caption" style={{ marginBottom: 8 }}>
+              {shown.length} {t.itemPh}s — {t.pricePh} · {t.stockLbl}</div>
+            <div className="list" style={{ fontSize: 15 }}>
+              {shown.map((p: any) => (
+                <div className="entry" key={p.id}
+                  role={role === "owner" ? "button" : undefined}
+                  style={role === "owner" ? { cursor: "pointer" } : undefined}
+                  onClick={role === "owner" ? () => setEdit(p) : undefined}>
+                  <span>{icon(p.name_en)} {p.name_en}</span>
+                  <span className="row" style={{ gap: 10 }}>
+                    <b>{inr(p.price_paise)}</b>
+                    <span className={"bal " + (low(p) ? "due" : "paid")}>
+                      {p.stock} {p.unit}</span>
+                  </span>
+                </div>))}
+            </div>
+          </div>
+        </>)}
+
+      {edit && (
+        <ProductEditSheet p={edit} t={t} onClose={() => setEdit(null)}
+          onSaved={() => { setEdit(null); load(); }} />)}
     </>
   );
+}
+
+function ProductEditSheet({ p, t, onClose, onSaved }: any) {
+  const [name, setName] = useState(p.name_en || "");
+  const [unit, setUnit] = useState(p.unit || "piece");
+  const [price, setPrice] = useState(((p.price_paise || 0) / 100).toString());
+  const [stock, setStock] = useState((p.stock ?? 0).toString());
+  const [busy, setBusy] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api.editProduct(p.id, {
+        name_en: name.trim() || p.name_en, unit,
+        price_paise: Math.round(parseFloat(price || "0") * 100),
+        stock: parseFloat(stock || "0") });
+      onSaved();
+    } finally { setBusy(false); }
+  }
+
+  async function del() {
+    setBusy(true);
+    try { await api.deleteProduct(p.id); onSaved(); }
+    catch { setBusy(false); setConfirmDel(false); }
+  }
+
+  return (<>
+    <div className="sheet-back" style={{ zIndex: 64 }} onClick={onClose} />
+    <div className="sheet" role="dialog" aria-label="edit product"
+      style={{ zIndex: 65 }}>
+      <div className="grab" aria-hidden="true" />
+      <b style={{ fontSize: 17 }}>{t.editItem}</b>
+      <div className="list" style={{ marginTop: 10, fontSize: 15 }}>
+        <label className="dim" style={{ fontSize: 13 }}>{t.itemName}</label>
+        <input value={name} onChange={(e) => setName(e.target.value)}
+          aria-label="item name" />
+        <label className="dim" style={{ fontSize: 13 }}>{t.unitLbl}</label>
+        <select value={unit} onChange={(e) => setUnit(e.target.value)}
+          aria-label="unit">
+          {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+        </select>
+        <div className="row" style={{ gap: 10 }}>
+          <label className="dim" style={{ fontSize: 13, flex: 1 }}>
+            {t.pricePh}</label>
+          <label className="dim" style={{ fontSize: 13, flex: 1 }}>
+            {t.stockLbl}</label>
+        </div>
+        <div className="row" style={{ gap: 10 }}>
+          <input inputMode="decimal" value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            aria-label="price rupees" style={{ flex: 1 }} />
+          <input inputMode="decimal" value={stock}
+            onChange={(e) => setStock(e.target.value)}
+            aria-label="stock" style={{ flex: 1 }} />
+        </div>
+      </div>
+      <div className="sheet-foot" style={{ marginTop: 12 }}>
+        {confirmDel ? (
+          <div className="row" style={{ gap: 8, width: "100%" }}>
+            <button className="danger big" style={{ flex: 1 }}
+              disabled={busy} onClick={del}>{t.delSure}</button>
+            <button className="link" onClick={() => setConfirmDel(false)}>
+              {t.delNo}</button>
+          </div>) : (
+          <div className="row" style={{ gap: 8, width: "100%" }}>
+            <button className="danger" style={{ flex: 1 }}
+              onClick={() => setConfirmDel(true)}>{t.deleteLbl}</button>
+            <button className="primary big" style={{ flex: 2 }}
+              disabled={busy || !name.trim()} onClick={save}>{t.saveLbl}</button>
+          </div>)}
+      </div>
+    </div>
+  </>);
 }
 
 function ShopPanel({ t, btype, onTypeChange }: any) {

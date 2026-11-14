@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app import auth, config, pipeline, relay, speak_text, tts
+from app import auth, config, oauth, pipeline, relay, speak_text, tts
 from app.db import ShopDB
 from app.seed import PRODUCTS, seed
 
@@ -66,6 +66,7 @@ seed_staff(db)
 
 app.include_router(auth.router)
 app.include_router(tts.router)
+app.include_router(oauth.router)
 
 
 def _adb(pair: tuple[str, int]) -> tuple[str, ShopDB]:
@@ -734,6 +735,15 @@ def edit_product(product_id: int, req: ProductReq,
                             stock=max(0.0, req.stock),
                             unit=req.unit[:20] or None)
     if not ok:
+        raise HTTPException(404, "product not found")
+    return {"ok": True}
+
+
+@app.delete("/api/products/{product_id}")
+def delete_product(product_id: int,
+                   pair: tuple = Depends(auth.require_owner_shop)):
+    _, sdb = _adb(pair)
+    if not sdb.delete_product(product_id):
         raise HTTPException(404, "product not found")
     return {"ok": True}
 

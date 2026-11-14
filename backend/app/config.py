@@ -74,3 +74,13 @@ SHOP_NAME = os.environ.get("SHOP_NAME", "Sharma Kirana Store")
 
 # Read-back confirmation threshold (paise) — above this we always re-ask
 CONFIRM_AMOUNT_PAISE = int(os.environ.get("CONFIRM_AMOUNT_PAISE", "50000"))
+
+# OAuth (Google / Discord) — owner sign-in. Leave blank to disable;
+# the UI hides providers that are not configured.
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+DISCORD_CLIENT_ID = os.environ.get("DISCORD_CLIENT_ID", "")
+DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
+# override redirect base if the API sits behind a different public host
+# than the incoming request (default: derived per-request)
+OAUTH_REDIRECT_BASE = os.environ.get("OAUTH_REDIRECT_BASE", "")

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, setToken } from "../lib/api";
+import { OAuthButtons } from "../lib/oauth";
 import { LANG_OPTIONS, pick, useLang } from "../lib/i18n";
 import { StoreIcon, UserIcon } from "../lib/icons";
 
@@ -122,6 +123,7 @@ export default function Login() {
             <button className="primary big" disabled={busy}
               onClick={doOwner}>{pick(lang, S.go)}</button>
             <div className="caption">{pick(lang, S.forgot)}</div>
+            <OAuthButtons next="/login" />
           </div>
         ) : (
           <div className="list" style={{ width: "100%" }}>
