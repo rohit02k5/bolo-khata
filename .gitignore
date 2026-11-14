@@ -10,3 +10,4 @@ outputs/
 out.json
 *.log
 relay_test.json
+.devin/mcp_config.local.json
