@@ -41,6 +41,85 @@ PRODUCTS = [
     ("Akhbar", "अख़बार", "పేపర్", "akhbar,akhbaar,newspaper,paper,dainik,दैनिक,वार्ता,వార్తాపత్రిక,news", "piece", 1, 30, 10, 600, 3),
 ]
 
+# catalog variants — same family = shown together in the stock "variants"
+# sheet (Maggi sizes/brands, rice types, dal types…). `family` groups them;
+# the base PRODUCTS row with the same name acts as the family head.
+# (name_en, name_hi, name_te, aliases, unit, pack, stock, reorder_pt,
+#  price_paise, family)
+VARIANTS = [
+    # ---- Maggi: sizes + local brand
+    ("Maggi 200g", "मैगी 200g", "మ్యాగీ 200g",
+     "maggi 200,200g maggi,maggi 200 gram,मैगी 200", "packet", 1, 25, 10,
+     1200, "Maggi"),
+    ("Maggi 50g", "मैगी 50g", "మ్యాగీ 50g",
+     "maggi 50,50g maggi,maggi 50 gram,मैगी 50", "packet", 1, 30, 12,
+     600, "Maggi"),
+    ("VP Maggi", "वीपी मैगी", "మ్యాగీ VP",
+     "vp maggi,vp,veg maggi,vp noodles", "packet", 1, 15, 6,
+     1300, "Maggi"),
+    # ---- Chawal: rice varieties/brands
+    ("Chawal Basmati", "चावल बासमती", "బియ్యం బాస్మతి",
+     "basmati,basmati chawal,basmati rice,india gate basmati,बासमती चावल",
+     "kg", 1, 30, 10, 7200, "Chawal"),
+    ("Chawal Sona Masoori", "चावल सोना मसूरी", "బియ్యం సోనా మసూరి",
+     "sona masoori,sona,chuchu,sona chawal,सोन चावल", "kg", 1, 25, 8,
+     4500, "Chawal"),
+    ("Chawal India Gate", "चावल इंडिया गेट", "బియ్యం ఇండియా గేట్",
+     "india gate,india gate rice,ig rice", "kg", 1, 20, 8,
+     6800, "Chawal"),
+    # ---- Daal: lentil types
+    ("Daal Arhar", "दाल अरहर", "అరహర్ పప్పు",
+     "arhar,arhar dal,toor,tuvar,तूर दाल,अरहर दाल", "kg", 1, 20, 8,
+     14000, "Daal"),
+    ("Daal Moong", "दाल मूंग", "మూగ పప్పు",
+     "moong,moong dal,mung,मूंग दाल", "kg", 1, 15, 6,
+     12000, "Daal"),
+    ("Daal Chana", "दाल चना", "శనగ పప్పు",
+     "chana dal,chana,chhole dal,चना दाल", "kg", 1, 15, 6,
+     9000, "Daal"),
+    # ---- Biscuits
+    ("Parle-G 100g", "पारले जी 100g", "పార్లే-జీ 100g",
+     "parle g 100,parle 100g,parle-g 100", "packet", 1, 50, 20,
+     1000, "Biscuits"),
+    ("Parle-G 250g", "पारले जी 250g", "పార్లే-జీ 250g",
+     "parle g 250,parle 250g,parle-g 250", "packet", 1, 30, 12,
+     2400, "Biscuits"),
+    ("Britannia Good Day", "ब्रिटानिया गुड डे", "బ్రిటానియా గుడ్ డే",
+     "good day,britannia good day,britannia biscuits", "packet", 1, 25,
+     10, 2000, "Biscuits"),
+    ("Britannia Marie", "ब्रिटानिया मैरी", "బ్రిటానియా మారీ",
+     "marie,britannia marie,marie gold", "packet", 1, 20, 8,
+     1500, "Biscuits"),
+    # ---- Atta / maida
+    ("Aata Chakki", "आटा चक्की", "ఆటా చక్కి",
+     "chakki atta,whole wheat atta,chakki", "kg", 1, 20, 8,
+     5800, "Atta"),
+    ("Aata Roller", "आटा रोलर", "ఆటా రోలర్",
+     "roller atta,refined atta", "kg", 1, 15, 6,
+     6200, "Atta"),
+    # ---- Sugar
+    ("Chini Loose", "चीनी लूज़", "చక్కెర టిడా",
+     "loose chini,chini loose,desi sugar", "kg", 1, 25, 10,
+     4400, "Sugar"),
+    ("Chini Packet", "चीनी पैकेट", "చక్కెర ప్యాకెట్",
+     "chini packet,1kg sugar,chini 1kg pack", "packet", 1, 20, 8,
+     4800, "Sugar"),
+    # ---- Oil
+    ("Tel Mustard", "तेल सरसों", "ఆవాలు నూనె",
+     "mustard oil,sarson tel,आवाला तेल", "liter", 1, 10, 4,
+     17000, "Oil"),
+    ("Tel Sunflower", "तेल सूर्यमुखि", "పొద్దుతిరుగుడు నూనె",
+     "sunflower oil,sunflower,saffola", "liter", 1, 12, 5,
+     17500, "Oil"),
+]
+
+# family label for the base catalog rows so they group with variants
+FAMILY_OF = {
+    "Maggi": "Maggi", "Chawal": "Chawal", "Daal": "Daal",
+    "Parle-G": "Biscuits", "Aata": "Atta", "Chini": "Sugar",
+    "Tel": "Oil", "Doodh": "Dairy", "Akhbar": "Newspaper",
+}
+
 # (name, PIN) — one assistant for the demo; roles come from login, not voice
 STAFF = [("Amit", "2468")]
 
@@ -68,11 +147,12 @@ CUSTOMERS = [
 
 
 def sync_catalog(db) -> None:
-    """Backfill name_hi/name_te/aliases onto an existing catalog so
-    alias additions reach old DBs without reseeding. Idempotent."""
+    """Backfill name_hi/name_te/aliases/family onto an existing catalog and
+    insert catalog variants that are missing. Idempotent."""
     for (en, hi, te, aliases, *_rest) in PRODUCTS:
+        fam = FAMILY_OF.get(en, "")
         row = db.conn.execute(
-            "SELECT id,aliases,name_hi,name_te FROM products "
+            "SELECT id,aliases,name_hi,name_te,family FROM products "
             "WHERE name_en=?", (en,)).fetchone()
         if row is None:
             continue
@@ -80,11 +160,20 @@ def sync_catalog(db) -> None:
                 if a.strip()}
         want = have | {a.strip() for a in aliases.split(",")
                        if a.strip()}
-        if want != have or not row["name_hi"] or not row["name_te"]:
+        if (want != have or not row["name_hi"] or not row["name_te"]
+                or (row["family"] or "") != fam):
             db.conn.execute(
-                "UPDATE products SET aliases=?, name_hi=?, name_te=? "
-                "WHERE id=?",
-                (",".join(sorted(want)), hi, te, row["id"]))
+                "UPDATE products SET aliases=?, name_hi=?, name_te=?, "
+                "family=? WHERE id=?",
+                (",".join(sorted(want)), hi, te, fam, row["id"]))
+    for (en, hi, te, aliases, unit, pack, stock, rp, price,
+         family) in VARIANTS:
+        row = db.conn.execute(
+            "SELECT id FROM products WHERE name_en=?", (en,)).fetchone()
+        if row is None:
+            db.add_product(en, hi, te, aliases=aliases, unit=unit,
+                           pack_size=pack, price_paise=price, stock=stock,
+                           reorder_point=rp, family=family)
     db.conn.commit()
 
 
@@ -120,8 +209,13 @@ def seed(db, *, days: int = 60, rng_seed: int = 42) -> None:
     for (en, hi, te, aliases, unit, pack, stock, rp, price, avg) in PRODUCTS:
         pid = db.add_product(en, hi, te, aliases=aliases, unit=unit,
                              pack_size=pack, price_paise=price, stock=stock,
-                             reorder_point=rp)
+                             reorder_point=rp, family=FAMILY_OF.get(en, ""))
         prod_ids[en] = pid
+    for (en, hi, te, aliases, unit, pack, stock, rp, price,
+         family) in VARIANTS:
+        db.add_product(en, hi, te, aliases=aliases, unit=unit,
+                       pack_size=pack, price_paise=price, stock=stock,
+                       reorder_point=rp, family=family)
     cust_ids = [db.add_customer(n, aliases=a) for n, a in CUSTOMERS]
     name_to_cid = {n: cid for (n, _), cid in zip(CUSTOMERS, cust_ids)}
     for cname, pname, qpd, unit in SUBSCRIPTIONS:

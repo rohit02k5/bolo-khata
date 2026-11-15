@@ -202,14 +202,16 @@ def edit_bill(items: list[dict], db, *, customer_id: int | None = None,
 _RESTOCK_HINTS = ("next time", "next week", "next month", "agli baar",
                   "list mein", "list me", "checklist", "note kar",
                   "note kar lo", "yaad rakh", "mangwana", "mangwani",
+                  "mangwane", "मंगवाना", "मंगवाने", "आदेश",
                   "mangwana hai", "order karna", "order karni",
                   "order karwana", "order karwani", "order",
                   "hafte baad", "hafta baad", "week baad", "din baad",
                   "parso", "aane wali", "aayegi", "aana hai",
                   "లిస్ట్", "ఆర్డర్")
-_VOICE_NOTE_HINTS = ("yaad dilao", "yaad dilana", "yaad dila", "remind karo",
-                     "reminder bhejo", "reminder bhej", "యాదు చేయి",
-                     "గుర్తు చేయి")
+_VOICE_NOTE_HINTS = ("yaad dilao", "yaad dilana", "yaad dila", "remind",
+                     "reminder bhejo", "reminder bhej", "याद",
+                     "भिजवानी", "भेजवानी", "రిమైండ్",
+                     "యాదు చేయి", "గుర్తు చేయి")
 _STOCK_OUT_HINTS = ("kharab", "nikala", "nikaal", "nikal diya", "damage",
                     "expired", "expire", "ghatao", "kam kar do",
                     "stock kam", "khatam", "samapt", "फट गया", "खराब",
@@ -228,7 +230,9 @@ _HINT_WORDS = {"next", "time", "agli", "baar", "list", "mein", "me",
                "month", "mahina", "parso", "aane", "aana", "wali",
                "aayegi", "ki", "ke", "ka", "ko", "se", "tak",
                "mujhe", "mujhko", "hamko", "hame", "hum", "main",
-               "mera", "meri", "mere", "me", "mein", "me"}
+               "mera", "meri", "mere", "me", "mein", "me",
+               "agle", "mangwane", "items", "item", "chahiye", "liye",
+               "waali", "vala", "vali", "sabhi", "sab", "type", "tarah"}
 
 
 def _non_hint_items(canon: str):
@@ -539,7 +543,6 @@ def _reminder_or_stockout(transcript: str, lang: str,
 
     if any(h in canon for h in _STOCK_OUT_HINTS):
         items = _non_hint_items(canon)
-        items = _non_hint_items(canon)
         for it in items:
             row, score, ties = _match(it.name, db.products())
             if row is not None:
@@ -590,16 +593,149 @@ def _reminder_or_stockout(transcript: str, lang: str,
     return None
 
 
+def _needs_llm(result: dict) -> bool:
+    """True when the deterministic pipeline produced something the
+    owner would read as a dumb/wrong answer — worth an LLM second look."""
+    if not result:
+        return True
+    if result.get("intent") in ("empty", "deny", "unknown", "clarify"):
+        return True
+    if (result.get("confidence") or 1.0) < 0.6:
+        return True
+    if result.get("noise_hint"):
+        return True
+    if result.get("kind") == "bill" and result.get("unresolved"):
+        return True
+    return False
+
+
+def _llm_proposal(transcript: str, lang: str, db) -> dict | None:
+    """Second opinion from the LLM for commands the rules can't parse.
+    Returns a proposal in the same shape, or None to keep the
+    deterministic result."""
+    from app import llm
+    if not llm.enabled():
+        return None
+    out = llm.interpret(transcript, db.products(), db.customers(), lang)
+    if not out or out["intent"] == "unknown":
+        return None
+    intent, items = out["intent"], out["items"]
+
+    if intent == "add_bill":
+        if not items:
+            return None
+        prop = edit_bill(
+            [{"name": i["name"], "qty": i["qty"], "unit": i["unit"]}
+             for i in items], db, customer_name=out.get("customer") or "",
+            lang=lang, transcript=transcript,
+            allow_price_override=False)
+        return prop  # may be None if nothing resolved
+
+    if intent == "restock":
+        if not items:
+            return None
+        matched = []
+        for i in items:
+            row, score, _ties = _match(i["name"], db.products())
+            matched.append({"name": row["name_en"] if row else i["name"],
+                            "product_id": row["id"] if row else None,
+                            "qty": i["qty"], "unit": i["unit"] or
+                            (row["unit"] if row else "piece"),
+                            "score": score})
+        lines = [f"{m['qty']:g} {m['unit']} {m['name']}" for m in matched]
+        desc = "Restock list: " + "; ".join(lines)
+        payload = {"kind": "restock", "text": transcript,
+                   "items": [{"name": m["name"], "product_id":
+                              m["product_id"], "qty": m["qty"],
+                              "unit": m["unit"]} for m in matched]}
+        pid = _stash("reminder", payload, transcript, lang, db)
+        return {"proposal_id": pid, "kind": "action",
+                "intent": "add_to_shopping_list", "description": desc,
+                "spoken": "Restock list mein daal diya. Sahi hai?",
+                "confidence": min((m["score"] for m in matched),
+                                   default=0.5),
+                "needs_confirm": True,
+                "unresolved": [m["name"] for m in matched
+                               if not m["product_id"]],
+                "lang": lang, "noise_hint": False}
+
+    if intent == "voice_reminder":
+        cust = out.get("customer") or ""
+        row = None
+        if cust:
+            row, _s, _t = _match(cust, db.customers())
+        payload = {"kind": "voice_note",
+                   "customer_id": row["id"] if row else None,
+                   "customer_name": row["name"] if row else cust,
+                   "text": transcript}
+        pid = _stash("reminder", payload, transcript, lang, db)
+        desc = (f"{row['name']} ko yaad dilana hai" if row
+                else f"'{cust or 'customer'}' ko yaad dilana hai")
+        return {"proposal_id": pid, "kind": "action",
+                "intent": "send_voice_reminder", "description": desc,
+                "spoken": f"{desc}. Sahi hai?",
+                "confidence": 0.9 if row else 0.5,
+                "needs_confirm": True,
+                "unresolved": [] if row else [f"customer:{cust or '?'}"],
+                "lang": lang}
+
+    if intent == "stock_out":
+        if not items:
+            return None
+        row, score, _t = _match(items[0]["name"], db.products())
+        if row is None:
+            return None
+        qty = abs(float(items[0]["qty"] or 1))
+        unit = items[0]["unit"] or row["unit"] or "piece"
+        desc = (f"{qty:g} {unit} {row['name_en']} stock se ghata do")
+        pid = _stash("stock_out",
+                     {"product_id": row["id"], "qty": -qty, "unit": unit,
+                      "product_name": row["name_en"]},
+                     transcript, lang, db)
+        return {"proposal_id": pid, "kind": "action",
+                "intent": "stock_out", "description": desc,
+                "spoken": f"{desc}. Sahi hai?", "confidence": score,
+                "needs_confirm": True, "unresolved": [], "lang": lang}
+
+    if intent == "stock_query":
+        q = out.get("query_item") or (items[0]["name"] if items else "")
+        if not q:
+            return None
+        row, score, _t = _match(q, db.products())
+        if row is None:
+            return None
+        bal = float(row["stock"] or 0)
+        price = inr_words(int(row["price_paise"] or 0))
+        desc = (f"{row['name_en']}: stock {bal:g} {row['unit']}, "
+                f"daam {price} per {row['unit']}")
+        if lang == "te":
+            spoken = (f"{row['name_te'] or row['name_en']} — "
+                      f"స్టాక్ {bal:g} {row['unit']}, "
+                      f"ధర {row['price_paise'] // 100} రూపాయలు")
+        else:
+            spoken = desc
+        return {"proposal_id": "", "kind": "action",
+                "intent": "stock_query", "description": desc,
+                "spoken": spoken + ".", "confidence": score,
+                "needs_confirm": False, "unresolved": [], "lang": lang,
+                "noise_hint": False}
+    return None
+
+
 def command_to_proposal(transcript: str, lang: str, db) -> dict:
     """Returns a JSON-safe proposal dict (with proposal_id)."""
     extra = _reminder_or_stockout(transcript, lang, db)
     if extra is not None:
+        if _needs_llm(extra):
+            lp = _llm_proposal(transcript, lang, db)
+            if lp is not None:
+                return lp
         return extra
 
     bill = parse_bill(transcript, db)
     if bill.intent == "add_bill" and bill.items:
         pid = _stash("bill", bill, transcript, lang, db)
-        return {
+        result = {
             "proposal_id": pid, "kind": "bill", "intent": "add_bill",
             "description": _bill_desc(bill),
             "spoken": _bill_spoken(bill, lang),
@@ -614,6 +750,11 @@ def command_to_proposal(transcript: str, lang: str, db) -> dict:
             "lang": lang,
             "noise_hint": bill.confidence < 0.75 or bool(bill.unresolved),
         }
+        if _needs_llm(result):
+            lp = _llm_proposal(transcript, lang, db)
+            if lp is not None:
+                return lp
+        return result
 
     cmd = parse(transcript, lang)
     if cmd.intent == "deny":
@@ -624,7 +765,7 @@ def command_to_proposal(transcript: str, lang: str, db) -> dict:
     spoken = prop.speak("hi" if lang == "hi" else "hinglish")
     if lang == "te":
         spoken = speak_text.for_action(prop, "te")
-    return {
+    result = {
         "proposal_id": pid, "kind": "action", "intent": prop.intent,
         "description": prop.description,
         "spoken": spoken,
@@ -635,6 +776,11 @@ def command_to_proposal(transcript: str, lang: str, db) -> dict:
         "lang": lang,
         "noise_hint": (prop.confidence or 1.0) < 0.75 or bool(prop.error),
     }
+    if _needs_llm(result):
+        lp = _llm_proposal(transcript, lang, db)
+        if lp is not None:
+            return lp
+    return result
 
 
 def confirm(proposal_id: str, accept: bool, db, *,

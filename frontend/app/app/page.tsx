@@ -82,7 +82,7 @@ const T: Record<string, Record<string, string>> = {
     coachGo: "Samajh gaya",
     scripted: "scripted test",
     saveBill: "Bill theek karo",
-    choose: "chuno",
+    choose: "chuno", allIt: "Sab",
   },
   te: {
     counter: "కౌంటర్", ledger: "ఖాతా", stock: "స్టాక్",
@@ -145,7 +145,7 @@ const T: Record<string, Record<string, string>> = {
     coachGo: "అర్థమైంది",
     scripted: "స్క్రిప్టెడ్ టెస్ట్",
     saveBill: "బిల్ సరిచేయండి",
-    choose: "ఎంచుకోండి",
+    choose: "ఎంచుకోండి", allIt: "అన్నీ",
   },
   en: {
     counter: "Counter", ledger: "Khata", stock: "Stock",
@@ -208,7 +208,7 @@ const T: Record<string, Record<string, string>> = {
     coachGo: "Got it",
     scripted: "scripted test",
     saveBill: "Fix the bill",
-    choose: "pick",
+    choose: "pick", allIt: "All",
   },
 };
 
@@ -784,8 +784,9 @@ export default function Home() {
 
       {tab === "ledger" && ledger && <LedgerPanel ledger={ledger}
         summary={summary} t={t} />}
-      {tab === "stock" && ledger && <StockPanel role={role} t={t} />}
-      {tab === "list" && <RemindersPanel t={t} />}
+      {tab === "stock" && ledger && <StockPanel role={role} t={t}
+        lang={lang} />}
+      {tab === "list" && <RemindersPanel t={t} lang={lang} />}
       {tab === "shop" && (<>
         <ShopPanel t={t} btype={btype}
           onTypeChange={() => api.shop().then(setShop)} />
@@ -1474,11 +1475,20 @@ function LeavePanel() {
   );
 }
 
-function RemindersPanel({ t }: any) {
+function RemindersPanel({ t, lang }: any) {
   const [rems, setRems] = useState<any[]>([]);
-  const load = () => api.reminders()
-    .then((r) => setRems(r.reminders)).catch(() => {});
+  const [cat, setCat] = useState<any>(null);
+  const load = () => {
+    api.reminders().then((r) => setRems(r.reminders)).catch(() => {});
+    api.catalog().then(setCat).catch(() => {});
+  };
   useEffect(() => { load(); }, []);
+  const prods = cat?.products || [];
+  const locName = (name: string, pid?: number) => {
+    const p = prods.find((x: any) => x.id === pid)
+      || prods.find((x: any) => x.name_en === name);
+    return p ? pname(p, lang) : name;
+  };
   const restock = rems.filter((r) => r.kind === "restock");
   const others = rems.filter((r) => r.kind !== "restock");
   const Tick = ({ id }: { id: number }) => (
@@ -1496,7 +1506,7 @@ function RemindersPanel({ t }: any) {
           return (
             <div className="entry" key={r.id}>
               <span>{(p.items || []).map(
-                (i: any) => `${i.qty} ${i.unit} ${i.name}`).join("; ") ||
+                (i: any) => `${i.qty} ${i.unit} ${locName(i.name, i.product_id)}`).join("; ") ||
                 p.text}</span>
               <Tick id={r.id} />
             </div>);
@@ -1518,12 +1528,12 @@ function RemindersPanel({ t }: any) {
         {!others.length && <div className="empty-state">none</div>}
         </div>
       </div>
-      <DeliveriesPanel t={t} />
+      <DeliveriesPanel t={t} lang={lang} prods={prods} />
     </>
   );
 }
 
-function DeliveriesPanel({ t }: any) {
+function DeliveriesPanel({ t, lang, prods }: any) {
   const [subs, setSubs] = useState<any[]>([]);
   const [on, setOn] = useState(true);
   const load = () => api.deliveries()
@@ -1544,7 +1554,10 @@ function DeliveriesPanel({ t }: any) {
         <div key={s.id} className="surface" style={{ padding: "16px 18px",
           marginBottom: 12 }}>
           <div className="row" style={{ justifyContent: "space-between" }}>
-            <b>{s.customer} — {s.product} {s.qty_per_day}/{s.unit}/din</b>
+            <b>{s.customer} — {(() => {
+              const p = (prods || []).find((x: any) => x.name_en === s.product);
+              return p ? pname(p, lang) : s.product;
+            })()} {s.qty_per_day}/{s.unit}/din</b>
             <b className="bal">₹{(s.month_total_paise / 100).toFixed(0)}</b>
           </div>
           <div className="cal" role="img"
@@ -1631,16 +1644,24 @@ const GROUP_RULES: [string, string[]][] = [
 ];
 
 function groupOf(p: any): string {
+  if (p.family) return p.family;
   const hay = `${p.name_en || ""} ${p.aliases || ""}`.toLowerCase();
   for (const [g, kws] of GROUP_RULES)
     if (kws.some((k) => hay.includes(k))) return g;
   return "Others";
 }
 
-function StockPanel({ role, t }: any) {
+/* localized product name — Telugu script for te, Devanagari for hi */
+function pname(p: any, lang: string): string {
+  if (lang === "te") return p.name_te || p.name_en || "";
+  if (lang === "hi") return p.name_hi || p.name_en || "";
+  return p.name_en || "";
+}
+
+function StockPanel({ role, t, lang }: any) {
   const [cat, setCat] = useState<any>(null);
   const [reo, setReo] = useState<any[]>([]);
-  const [grp, setGrp] = useState("");          // "" = show all
+  const [grp, setGrp] = useState("");          // "" = show all families
   const [edit, setEdit] = useState<any>(null); // product open in editor
   const load = () => {
     api.catalog().then(setCat).catch(() => {});
@@ -1649,55 +1670,46 @@ function StockPanel({ role, t }: any) {
   useEffect(load, []);
   if (!cat) return <div className="empty-state">…</div>;
   const low = (p: any) => p.stock <= (p.reorder_point || 0);
-  const counts = new Map<string, number>();
+  const fams = new Map<string, any[]>();
   for (const p of cat.products) {
     const g = groupOf(p);
-    counts.set(g, (counts.get(g) || 0) + 1);
+    if (!fams.has(g)) fams.set(g, []);
+    fams.get(g)!.push(p);
   }
-  const chips = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  const shown = grp ? cat.products.filter((p: any) => groupOf(p) === grp)
-                    : cat.products;
-
-  function StockRow({ p, onTap }: any) {
-    return (
-      <div className="entry" role={onTap ? "button" : undefined}
-        style={onTap ? { cursor: "pointer" } : undefined}
-        onClick={onTap}>
-        <span style={{ minWidth: 0, flex: 1 }}>
-          <span className="row">
-            <span>{icon(p.name_en)} {p.name_en}</span>
-            {low(p) && <span className="pill disputed">low</span>}
-          </span>
-          <span className="dim" style={{ fontSize: 13 }}>
-            {inr(p.price_paise)}/{p.unit}</span>
-          <span className="stockbar" aria-hidden="true">
-            <i style={{ width:
-              `${Math.min(100, (p.stock / Math.max(1,
-                (p.reorder_point || 10) * 3)) * 100)}%`,
-              background: low(p) ? "var(--bad)" : "var(--ok)" }} />
-          </span>
-        </span>
-        <b>{p.stock} {p.unit}</b>
-        {onTap && <span className="dim" aria-hidden="true"
-          style={{ fontSize: 20, marginLeft: -4 }}>›</span>}
-      </div>);
-  }
+  const chips = [...fams.entries()].sort((a, b) => b[1].length - a[1].length);
+  const open = grp ? fams.get(grp) || [] : [];
+  const shown = grp ? open : [];
 
   return (
     <>
       <div className="section-head" style={{ marginTop: 8 }}>Stock</div>
       <div className="chip-row" role="tablist" aria-label="categories">
         <button className={"chip" + (!grp ? " sel" : "")}
-          onClick={() => setGrp("")}>Sab</button>
-        {chips.map(([g, n]) => (
+          onClick={() => setGrp("")}>{t.allIt}</button>
+        {chips.map(([g, ps]) => (
           <button key={g} className={"chip" + (grp === g ? " sel" : "")}
-            onClick={() => setGrp(g)}>{g} · {n}</button>))}
+            onClick={() => setGrp(g)}>{g} · {ps.length}</button>))}
       </div>
       <div className="surface" style={{ padding: "4px 16px" }}>
         <div className="list">
-          {shown.map((p: any) => (
-            <StockRow key={p.id} p={p}
-              onTap={role === "owner" ? () => setEdit(p) : undefined} />))}
+          {chips.map(([g, ps]) => {
+            const anyLow = ps.some(low);
+            return (
+              <div key={g} className="entry" role="button"
+                style={{ cursor: "pointer" }}
+                onClick={() => setGrp(g)}>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span className="row">
+                    <span>{g}</span>
+                    {anyLow && <span className="pill disputed">low</span>}
+                  </span>
+                  <span className="dim" style={{ fontSize: 13 }}>
+                    {ps.length} {t.itemPh}{ps.length > 1 ? "s" : ""}</span>
+                </span>
+                <span className="dim" aria-hidden="true"
+                  style={{ fontSize: 20 }}>›</span>
+              </div>);
+          })}
         </div>
       </div>
       {!!reo.length && (<>
@@ -1714,8 +1726,8 @@ function StockPanel({ role, t }: any) {
         </div>
       </>)}
 
-      {/* category window — every variant in the group, with prices */}
-      {grp && (
+      {/* family window — every variant/brand with price + stock */}
+      {!!grp && (
         <>
           <div className="sheet-back" style={{ zIndex: 60 }}
             onClick={() => setGrp("")} />
@@ -1732,11 +1744,17 @@ function StockPanel({ role, t }: any) {
                   role={role === "owner" ? "button" : undefined}
                   style={role === "owner" ? { cursor: "pointer" } : undefined}
                   onClick={role === "owner" ? () => setEdit(p) : undefined}>
-                  <span>{icon(p.name_en)} {p.name_en}</span>
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span className="row">
+                      <span>{icon(p.name_en)} {pname(p, lang)}</span>
+                      {low(p) && <span className="pill disputed">low</span>}
+                    </span>
+                    <span className="dim" style={{ fontSize: 13 }}>
+                      {inr(p.price_paise)}/{p.unit}
+                      {p.pack_size > 1 ? ` · pack ${p.pack_size}` : ""}</span>
+                  </span>
                   <span className="row" style={{ gap: 10 }}>
-                    <b>{inr(p.price_paise)}</b>
-                    <span className={"bal " + (low(p) ? "due" : "paid")}>
-                      {p.stock} {p.unit}</span>
+                    <b>{p.stock} {p.unit}</b>
                     {role === "owner" &&
                       <span className="dim" aria-hidden="true">›</span>}
                   </span>

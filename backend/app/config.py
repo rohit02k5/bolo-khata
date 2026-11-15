@@ -84,3 +84,9 @@ DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "")
 # override redirect base if the API sits behind a different public host
 # than the incoming request (default: derived per-request)
 OAUTH_REDIRECT_BASE = os.environ.get("OAUTH_REDIRECT_BASE", "")
+
+# LLM fallback for voice commands the deterministic parser can't handle
+# (NVIDIA NIM, OpenAI-compatible). Blank key -> fallback disabled.
+NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
+NVIDIA_MODEL = os.environ.get(
+    "NVIDIA_MODEL", "google/gemma-4-31b-it")

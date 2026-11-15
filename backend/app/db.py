@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS products (
     aliases TEXT DEFAULT '',
     unit TEXT NOT NULL DEFAULT 'piece',
     pack_size INTEGER DEFAULT 1,
+    family TEXT DEFAULT '',
     price_paise INTEGER DEFAULT 0,
     stock REAL DEFAULT 0,
     reorder_point REAL DEFAULT 0
@@ -207,6 +208,11 @@ class ShopDB:
         if "invite_code" not in scols:
             self.conn.execute(
                 "ALTER TABLE staff ADD COLUMN invite_code TEXT")
+        pcols = {r[1] for r in
+                 self.conn.execute("PRAGMA table_info(products)")}
+        if "family" not in pcols:
+            self.conn.execute(
+                "ALTER TABLE products ADD COLUMN family TEXT DEFAULT ''")
         ccols = {r[1] for r in
                  self.conn.execute("PRAGMA table_info(customer_accounts)")}
         if "contact" not in ccols:
@@ -407,13 +413,14 @@ class ShopDB:
     def add_product(self, name_en: str, name_hi: str = "", name_te: str = "",
                     *, aliases: str = "", unit: str = "piece",
                     pack_size: int = 1, price_paise: int = 0,
-                    stock: float = 0.0, reorder_point: float = 0.0) -> int:
+                    stock: float = 0.0, reorder_point: float = 0.0,
+                    family: str = "") -> int:
         cur = self.conn.execute(
             "INSERT INTO products (shop_id,name_en,name_hi,name_te,aliases,"
-            "unit,pack_size,price_paise,stock,reorder_point) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "unit,pack_size,family,price_paise,stock,reorder_point) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (self.shop_id, name_en, name_hi, name_te, aliases, unit, pack_size,
-             price_paise, stock, reorder_point))
+             family[:60], price_paise, stock, reorder_point))
         self.conn.commit()
         return cur.lastrowid
 
@@ -1088,7 +1095,7 @@ class ShopDB:
         return row
 
     # -------------------------------------------------------------- other
-    def keyterms(self, limit: int = 180) -> list[str]:
+    def keyterms(self, limit: int = 400) -> list[str]:
         """Catalog + customer names for Prisma v3.0 keyterms biasing."""
         terms: list[str] = []
         for r in self.products() + self.customers():
