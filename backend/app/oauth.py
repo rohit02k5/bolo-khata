@@ -20,7 +20,7 @@ import logging
 import os
 import secrets
 import time
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import requests
 from fastapi import APIRouter, HTTPException, Request
@@ -36,6 +36,36 @@ _FRONTEND = os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")
 _users_db: ShopDB | None = None
 
 
+def _frontend_origin(request: Request) -> str:
+    """Origin the *browser* should be sent back to after OAuth.
+
+    FRONTEND_ORIGIN points at the internal Next server in the single-URL
+    deploy (the backend proxies page traffic to it), so it must NOT be
+    used for browser redirects there - the browser needs the public
+    origin that served the callback. Precedence:
+
+      1. OAUTH_FRONTEND_ORIGIN env (explicit override)
+      2. FRONTEND_ORIGIN, when it is a real (non-localhost) URL - i.e. a
+         split frontend/API deploy
+      3. the request's own public host (single-URL deploy behind Render /
+         ngrok / any TLS-terminating proxy)
+      4. FRONTEND_ORIGIN default (local dev: Next on :3000)
+    """
+    explicit = os.environ.get("OAUTH_FRONTEND_ORIGIN")
+    if explicit:
+        return explicit.rstrip("/")
+    fe_host = urlparse(_FRONTEND).hostname or ""
+    if fe_host not in ("localhost", "127.0.0.1", "::1"):
+        return _FRONTEND.rstrip("/")
+    host = (request.headers.get("x-forwarded-host")
+            or request.headers.get("host") or "")
+    if host and "localhost" not in host and "127.0.0.1" not in host:
+        proto = (request.headers.get("x-forwarded-proto")
+                 or request.url.scheme or "https")
+        return f"{proto}://{host}"
+    return _FRONTEND.rstrip("/")
+
+
 def _db() -> ShopDB:
     global _users_db
     if _users_db is None:
@@ -45,7 +75,8 @@ def _db() -> ShopDB:
 
 def _fail(request: Request, reason: str) -> RedirectResponse:
     return RedirectResponse(
-        f"{_FRONTEND}/auth/callback?error={reason}", status_code=302)
+        f"{_frontend_origin(request)}/auth/callback?error={reason}",
+        status_code=302)
 
 
 def _sign_state(payload: dict) -> str:
@@ -212,4 +243,5 @@ def oauth_callback(provider: str, request: Request,
         "next": st.get("next") or "/login",
     })
     return RedirectResponse(
-        f"{_FRONTEND}/auth/callback?{params}", status_code=302)
+        f"{_frontend_origin(request)}/auth/callback?{params}",
+        status_code=302)
