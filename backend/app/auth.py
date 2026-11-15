@@ -1,12 +1,16 @@
 """Auth: email+password users, seeded owner, staff PIN, customer PIN.
 
-Tokens map to (actor, shop_id) in memory with a TTL. Roles and shop
-scope are decided server-side by the login on each device — never by
-voice.
+Tokens are stateless HMAC-signed blobs (actor, shop_id, expiry) keyed
+by SESSION_SECRET — they survive backend restarts and redeploys, which
+matters on hosts that recycle the process (Render free tier, dev).
 """
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import secrets
 import time
 
@@ -17,30 +21,46 @@ from app import config
 
 router = APIRouter()
 
-# token -> (actor, shop_id, expiry)
 #   actor:  "owner" | "owner:{user_id}" | "staff:{id}" | "cust:{account_id}"
 #   shop_id: 0 means "no shop yet" (fresh signup before onboarding)
-_TOKENS: dict[str, tuple[str, int, float]] = {}
 _TTL = 12 * 3600
 
 
-class LoginReq(BaseModel):
-    email: str
-    password: str
+def _b64e(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _b64d(s: str) -> bytes:
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
 
 
 def issue_token(actor: str, shop_id: int) -> str:
-    token = secrets.token_urlsafe(32)
-    _TOKENS[token] = (actor, shop_id, time.time() + _TTL)
-    return token
+    payload = {"a": actor, "s": int(shop_id),
+               "e": time.time() + _TTL}
+    raw = _b64e(json.dumps(payload, separators=(",", ":")).encode())
+    sig = hmac.new(config.SESSION_SECRET.encode(), raw.encode(),
+                   hashlib.sha256).hexdigest()
+    return f"{raw}.{sig}"
 
 
 def _lookup(authorization: str) -> tuple[str, int]:
     token = authorization.removeprefix("Bearer ").strip()
-    info = _TOKENS.get(token)
-    if info and info[2] > time.time():
-        return info[0], info[1]
-    raise HTTPException(401, "login required")
+    try:
+        raw, sig = token.rsplit(".", 1)
+    except ValueError:
+        raise HTTPException(401, "login required")
+    want = hmac.new(config.SESSION_SECRET.encode(), raw.encode(),
+                    hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, want):
+        raise HTTPException(401, "login required")
+    try:
+        data = json.loads(_b64d(raw))
+        actor, shop_id, exp = data["a"], int(data["s"]), float(data["e"])
+    except Exception:
+        raise HTTPException(401, "login required")
+    if exp < time.time():
+        raise HTTPException(401, "login required")
+    return actor, shop_id
 
 
 @router.post("/api/login")
